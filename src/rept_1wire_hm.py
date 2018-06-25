@@ -18,17 +18,15 @@ import time
 import argparse
 import socket
 import logging
-# statistics from scipy
-#from scipy import stats
+
 import emonhub_coder
-import serial
 
 # use OWFS module
 import ow
 
 # hm imports
-from heatmisercontroller import hm_constants, network, logging_setup
-from heatmisercontroller.exceptions import hmResponseError, hmControllerTimeError
+from heatmisercontroller import network, logging_setup
+from heatmisercontroller.exceptions import HeatmiserResponseError, HeatmiserControllerTimeError
 
 #setup logging
 logfolder = '/home/pi/rept_logs'
@@ -37,10 +35,10 @@ logging_setup.initialize_logger(logfolder, logging.WARN, True)
 # set up parser with command summary
 parser = argparse.ArgumentParser(
         description='Rolling 1-wire temperatures report')
-# set up arguments with associated help and defaults 
-parser.add_argument('-i', 
-        dest='sample_interval', 
-        help='interval in seconds between samples', 
+# set up arguments with associated help and defaults
+parser.add_argument('-i',
+        dest='sample_interval',
+        help='interval in seconds between samples',
         default='30')
 
 # process the arguments
@@ -84,7 +82,7 @@ for s in rawlist:
         # get teh temperature from that sensor
         T = s.temperature
         # increment count of sensors
-        n = n + 1  
+        n = n + 1
         # tell the user teh good news
         logging.info("T: " + T)
         # record that as a sensor to interrogate
@@ -107,15 +105,15 @@ hmn1 = network.HeatmiserNetwork(localconfigfile)
 
 # CYCLE THROUGH ALL CONTROLLERS
 for current_controller in hmn1.controllers:
-  logging.info("Getting all data control %2d in %s *****************************" % (current_controller._address, current_controller._long_name))
+  logging.info("Getting all data control %2d in %s *****************************" % (current_controller.address, current_controller.long_name))
 
   try:
-    current_controller.readAll()
-  except (hmResponseError, hmControllerTimeError) as e:
-    print "C%d in %s Failed to Read due to %s" % (current_controller._address,  current_controller._name.ljust(4), str(e))
+    current_controller.read_all()
+  except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
+    print "C%d in %s Failed to Read due to %s" % (current_controller.address,  current_controller.name.ljust(4), str(err))
   else:
-    disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.address, current_controller.readAirTemp(), current_controller.readAirSensorType(), current_controller.setroomtemp, current_controller.heatingdemand)
-    if current_controller.isHotWater():
+    disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
+    if current_controller.is_hot_water():
       print "%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand)
     else:
       print disptext
@@ -129,7 +127,7 @@ while 1:
     # note this will skip some if specified interval is too short
     #  - it finds the next after now, not next after last 
     sleeptime = sample_interval - (time.time() % sample_interval)
-    time.sleep(sleeptime) 
+    time.sleep(sleeptime)
 
     # get time now and record it
     tt = int(time.time())  # we only record to integer seconds
@@ -162,18 +160,18 @@ while 1:
         fo.write(stringout)
         fo.write("\n")
 
-        outputstr += ' {:-3.0f}'.format(T*10) 
+        outputstr += ' {:-3.0f}'.format(T*10)
 
     fo.close()
 
     ### do same for hm controllers
 
     #force read all fields at the same time to all optimisation
-    allread = hmn1.All.readFields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
+    allread = hmn1.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
     #get demands and temps replacing nones
     demands = [99 if row is None or row[3] is None else row[3] for row in allread]
     hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
-    temps = [-10 if temp is None else temp for temp in hmn1.All.readAirTemp()]
+    temps = [-10 if temp is None else temp for temp in hmn1.All.read_air_temp()]
     
     logging.info('Temps ' + ' '.join(map(str,temps)))
     logging.info('Demands ' + ' '.join(map(str,demands + [hotwater])))
