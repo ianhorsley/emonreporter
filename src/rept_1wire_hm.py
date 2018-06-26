@@ -13,7 +13,7 @@
 # /home/pi/data/emonhub.conf
 
 # standard library modules used in code
-import sys
+#import sys
 import time
 import argparse
 import socket
@@ -134,7 +134,7 @@ while 1:
 
     # get time now and record it
     tt = int(time.time()) # we only record to integer seconds
-    
+
     logging.info("Logging cyle at " + str(tt))
 
     try:
