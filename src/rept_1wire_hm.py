@@ -60,13 +60,16 @@ logging.info("  sample interval: "+str(sample_interval) + " seconds")
 # connect to localhost port 4304 where owserver should be running
 try:
 	ow.init('4304');
-except:
-	logging.warn('Could not connect to ow')
+except exNoController as err:
+	logging.warn('Could not connect to ow due to %s'%str(err))
 
 # now determine what sensors we will consider
 logging.debug("locate sensors and take initial readings:")
 # every sensor on the bus added to the list
 rawlist = ow.Sensor('/').sensorList()
+
+#exError
+#exNotInitialized, exUnknownSensor
 
 # create lists for teh data we will accumulate
 sensorlist=[]
@@ -125,21 +128,21 @@ print
 while 1:
     # determine how long to wait until next interval
     # note this will skip some if specified interval is too short
-    #  - it finds the next after now, not next after last 
+    #  - it finds the next after now, not next after last
     sleeptime = sample_interval - (time.time() % sample_interval)
     time.sleep(sleeptime)
 
     # get time now and record it
-    tt = int(time.time())  # we only record to integer seconds
+    tt = int(time.time()) # we only record to integer seconds
     
     logging.info("Logging cyle at " + str(tt))
-    
+
     try:
         fo = open(logfolder + "/testlog"+str(int(tt/86400))+".txt","ab")
     except IOError as e:
         logging.warn('failed to create log file : I/O error({0}): {1}'.format(e.errno, e.strerror))
-    except: #handle other exceptions such as attribute errors
-        logging.warn("Unexpected error:", sys.exc_info()[0])
+    #except: #handle other exceptions such as attribute errors
+    #    logging.warn("Unexpected error:" + str(sys.exc_info()[0]))
     #reset output string
     outputstr = node
 
@@ -189,5 +192,5 @@ while 1:
         logging.info('socket send %s'%outputstr2)
         soc.send(outputstr2 + '\r\n')
         soc.close()
-    except:
-        logging.warn('could not connect to emonhub')
+    except IOerror as err:
+        logging.warn('could not connect to emonhub due to ' + str(err))
