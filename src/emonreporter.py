@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-"""
+"""EmonReporter
 
-  This code is released under the ....
-  
-  Ian Horsley
+Monitors data sensor network, and sends data to EmonHub 
+through scoket interface.
+
+Communicates with the user through an ??? EmonHubSetup
 
 """
 
@@ -21,16 +22,6 @@ import argparse
 # import emonhub_reporter as ehr
 # import emonhub_interfacer as ehi
 # import emonhub_coder as ehc
-
-"""class EmonReporter
-
-Monitors data sensor network, and sends data to EmonHub 
-through scoket interface.
-
-Communicates with the user through an ??? EmonHubSetup
-
-"""
-
 
 class EmonReporter(object):
     
@@ -203,7 +194,7 @@ class EmonReporter(object):
     def _set_logging_level(self, level='WARNING', log=True):
         """Set logging level.
         
-        level (string): log level name in 
+        level (string): log level name in
         ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
         
         """
