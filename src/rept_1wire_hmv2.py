@@ -36,8 +36,8 @@ def initialise_setup(configfile=None):
     # Select default configuration file if none provided
     if configfile is None:
         module_path = os.path.abspath(os.path.dirname(__file__))
-        configfile = os.path.join(module_path, "reporter.conf")
-      
+        configfile = os.path.join(module_path, "../conf/reporter.conf")
+
     # Initialize controller setup
     try:
         setup = hms.HeatmiserControllerFileSetup(configfile)
@@ -81,8 +81,6 @@ def initialise_1wire():
                 if s._usePath in expected_sensors:
                     # increment count of sensors detected
                     n += 1
-                    # tell the user the good news
-                    logging.info("T: " + T)
                     # record that as a sensor to interrogate
                     sensorlist[expected_sensors.index(s._usePath)] = s
                     logging.info("Sensor, %s, found that will be logged with initial reading %s."%(s, T))
@@ -95,36 +93,128 @@ def initialise_1wire():
                 # record the time of reading and value read
             else:
                 # log the non temperature sensors
-                logging.info("Non temperature sensor, %s, found that won't be logged."%s)
+                logging.warn("Non temperature sensor, %s, found that won't be logged."%s)
         except ow.exUnknownSensor:
             logging.warn("Sensor gone away during setup")
     logging.info("bus search done - %i sensors found - %i temperature sensors logging - %i sensors missing"%(len(rawlist), n, len(expected_sensors) - n))
+    
+    return sensorlist
 
+def get_1wire_data():
+    """Get data from 1 wire network and and return formatted string"""
+    #reset output string
+    outputstr = setup.settings['emonsocket']['node']
+
+    # work through list of sensors
+    for s in sensorlist1wire:
+        if s is None:
+            logging.debug('Sensor ' + str(s) + ' reportied as out of range.')
+            T = float(setup.settings['emonsocket']['temperaturenull'])
+        else:
+            n = sensorlist1wire.index(s)  # the array register of this sensor
+            try:  # just in case it has been unplugged
+                T=float(s.temperature)
+            except ow.exUnknownSensor:  # it has been unplugged
+                logging.warn('Sensor ' + str(s) + ' gone away - ignoring')
+                T = float(setup.settings['emonsocket']['temperaturenull'])
+                #continue  # so we'll jump to the next in the list
+            else:
+                # print sensor name and current value
+                logging.debug( 'Sensor {!s}: {:-6.2f}'.format(s.id,T))
+                stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,s.id,T)
+                datalogger.log(stringout)
+
+        outputstr += ' {:-3.0f}'.format(T*10)
+    
+    logging.debug(outputstr)
+    return outputstr
+    
 def initialise_heatmiser(localconfigfile=None):
     """Initialise heatmiser network and check for sensors"""
-    ###setup hm network and controllers
     logging.info("initialising hm network")
-    hmn1 = network.HeatmiserNetwork(localconfigfile)
+    hmn = network.HeatmiserNetwork(localconfigfile)
 
     # CYCLE THROUGH ALL CONTROLLERS
-    for current_controller in hmn1.controllers:
-      logging.info("Getting all data control %2d in %s *****************************" % (current_controller.address, current_controller.long_name))
+    for current_controller in hmn.controllers:
+      logging.info("Getting all data control %2d in %s" % (current_controller.address, current_controller.long_name))
 
       try:
         current_controller.read_all()
       except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-        print "C%d in %s Failed to Read due to %s" % (current_controller.address,  current_controller.name.ljust(4), str(err))
+        logging.warn("C%d in %s Failed to Read due to %s" % (current_controller.address,  current_controller.name.ljust(4), str(err)))
       else:
         disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
         if current_controller.is_hot_water():
-          print "%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand)
+          logging.info("%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand))
         else:
-          print disptext
-        current_controller.display_heating_schedule()
-        current_controller.display_water_schedule()
-    print
+          logging.info(disptext)
+          
+    return hmn
+
+def get_heatmiser_data():
+    """Get data from heatmiser network and and return formatted string"""
+    #force read all fields at the same time to all optimisation
+    allread = hmn.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
     
+    #get demands and temps replacing nones
+    demands = [99 if row is None or row[3] is None else row[3] for row in allread]
+    hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
+    temps = [-10 if temp is None else temp for temp in hmn.All.read_air_temp()]
     
+    logging.debug('Temps ' + ' '.join(map(str,temps)))
+    logging.debug('Demands ' + ' '.join(map(str,demands + [hotwater])))
+    
+    #enocde using emonhubs own module
+    encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
+    
+    #zip temp and demands and join string
+    outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
+    
+    logging.debug(outputstr)
+    return outputstr
+    
+class LocalDatalogger(object):
+    """Manages a local daily data logging file."""
+    def __init__(self, logfolder):
+        self._logfolder = logfolder
+        
+        self._outputfile = None
+        self._file_day_stamp = False
+        
+        self._open_file(time.time())
+    
+    def _check_day(self, timestamp):
+        """Open new file if the day has changed."""
+        daystamp = int(timestamp/86400)
+        if self._file_day_stamp != daystamp:
+            self._close_file
+            self._open_file(timestamp)
+    
+    def _open_file(self, timestamp):
+        """Open data file and store handle"""
+        self._file_day_stamp = int(timestamp/86400)
+        try:
+            self._outputfile = open(self._logfolder + "/testlog"+str(self._file_day_stamp)+".txt","ab")
+        except IOError as err:  
+            self._file_day_stamp = False
+            logging.warn('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))            
+    
+    def _close_file(self):
+        """Close data file."""
+        if not self._file_day_stamp is False:
+            self._outputfile.close()
+            self._file_day_stamp = False
+    
+    def log(self, stringout):
+        """Log data to todays log file."""
+        self._check_day(time.time())
+        if not self._file_day_stamp is False:
+            try:
+                self._outputfile.write(stringout)
+            except IOError as err:  
+                self._close_file()
+                logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))          
+             
 # set up parser with command summary
 parser = argparse.ArgumentParser(
         description='Rolling 1-wire temperatures report')
@@ -142,17 +232,19 @@ sample_interval=float(args.sample_interval)
 setup, localconfigfile = initialise_setup()
 
 #setup logging
-logging_setup.initialize_logger(setup.settings['logging']['logfolder'], logging.WARN)
+logging_setup.initialize_logger(setup.settings['logging']['logfolder'], logging.WARN, True)
 
 # tell the user what is happening
 logging.info("1 wire bus reporting and hmstat reporting")
 logging.info("  sample interval: "+str(sample_interval) + " seconds")
 
-initialise_1wire()
+sensorlist1wire = initialise_1wire()
 
-initialise_heatmiser(localconfigfile)
+hmn = initialise_heatmiser(localconfigfile)
 
-quit()
+datalogger = LocalDatalogger(setup.settings['logging']['logfolder'])
+
+logging.info("Entering reading loop")
 
 # now loop forever reading the identified sensors
 while 1:
@@ -166,61 +258,18 @@ while 1:
     tt = int(time.time()) # we only record to integer seconds
 
     logging.info("Logging cyle at " + str(tt))
-
-    try:
-        fo = open(logfolder + "/testlog"+str(int(tt/86400))+".txt","ab")
-    except IOError as e:
-        logging.warn('failed to create log file : I/O error({0}): {1}'.format(e.errno, e.strerror))
-    #except: #handle other exceptions such as attribute errors
-    #    logging.warn("Unexpected error:" + str(sys.exc_info()[0]))
-    #reset output string
-    outputstr = node
-
-    # work through list of sensors
-    for s in sensorlist:
-        n = sensorlist.index(s)  # the array register of this sensor
-        try:  # just in case it has been unplugged
-            T=float(s.temperature)
-        except ow.exUnknownSensor:  # it has been unplugged
-            logging.info('  sensor ' + str(s) + ' gone away - just ignore')
-            logging.info('sensor ' + str(s) + ' left')
-            continue  # so we'll jump to the next in the list
-
-        # print sensor name and current value
-        logging.info( '  {!s}: {:-6.2f}'.format(s.id,T))
-        stringout = '{}:{!s}:{:+06.2f}'.format(tt,s.id,T)
-
-        fo.write(stringout)
-        fo.write("\n")
-
-        outputstr += ' {:-3.0f}'.format(T*10)
-
-    fo.close()
-
-    ### do same for hm controllers
-
-    #force read all fields at the same time to all optimisation
-    allread = hmn1.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
-    #get demands and temps replacing nones
-    demands = [99 if row is None or row[3] is None else row[3] for row in allread]
-    hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
-    temps = [-10 if temp is None else temp for temp in hmn1.All.read_air_temp()]
     
-    logging.info('Temps ' + ' '.join(map(str,temps)))
-    logging.info('Demands ' + ' '.join(map(str,demands + [hotwater])))
-    #enocde using emonhubs own module
-    encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
-    #zip temp and demands and join string
-    outputstr2 = ' '.join([hmnode, str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
-    
-    #print outputstr2
+    outputstr_1wire = get_1wire_data()
+
+    outputstr_hmn = get_heatmiser_data()
+
     try:
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        soc.connect((host,port))
-        logging.info('socket send %s'%outputstr)
-        soc.send(outputstr + '\r\n')
-        logging.info('socket send %s'%outputstr2)
-        soc.send(outputstr2 + '\r\n')
+        soc.connect((setup.settings['emonsocket']['host'],int(setup.settings['emonsocket']['port'])))
+        logging.info('socket send %s'%outputstr_1wire)
+        soc.send(outputstr_1wire + '\r\n')
+        logging.info('socket send %s'%outputstr_hmn)
+        soc.send(outputstr_hmn + '\r\n')
         soc.close()
-    except IOerror as err:
+    except IOError as err:
         logging.warn('could not connect to emonhub due to ' + str(err))

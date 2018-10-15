@@ -103,7 +103,7 @@ logging.info("bus search done - " + str(n) + " temperature sensors found")
 
 ###setup hm network and controllers
 logging.info("initialising hm network")
-localconfigfile = '/home/pi/emonreporter/src/hmcontroller.conf'
+localconfigfile = '/home/pi/emonreporter/conf/reporter.conf'
 hmn1 = network.HeatmiserNetwork(localconfigfile)
 
 # CYCLE THROUGH ALL CONTROLLERS
@@ -192,5 +192,5 @@ while 1:
         logging.info('socket send %s'%outputstr2)
         soc.send(outputstr2 + '\r\n')
         soc.close()
-    except IOerror as err:
+    except IOError as err:
         logging.warn('could not connect to emonhub due to ' + str(err))
