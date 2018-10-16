@@ -175,7 +175,7 @@ while 1:
     demands = [99 if row is None or row[3] is None else row[3] for row in allread]
     hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
     temps = [-10 if temp is None else temp for temp in hmn1.All.read_air_temp()]
-    
+
     logging.info('Temps ' + ' '.join(map(str,temps)))
     logging.info('Demands ' + ' '.join(map(str,demands + [hotwater])))
     #enocde using emonhubs own module

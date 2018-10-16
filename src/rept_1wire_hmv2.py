@@ -44,7 +44,7 @@ def initialise_setup(configfile=None):
     except hms.HeatmiserControllerSetupInitError as err:
         logging.error(err)
         sys.exit("Unable to load configuration file: " + configfile)
-        
+
     return setup, configfile
 
 def initialise_1wire():
@@ -66,9 +66,6 @@ def initialise_1wire():
 
     # create lists for the data we will report
     sensorlist=[None] * len(expected_sensors)
-    
-    # get time in seconds now
-    tt=int(time.time())
 
     n=0 # initialise number of expected temperature sensors found so far
     logging.info("initialising one wire array")
@@ -153,25 +150,29 @@ def initialise_heatmiser(localconfigfile=None):
 
 def get_heatmiser_data():
     """Get data from heatmiser network and and return formatted string"""
-    #force read all fields at the same time to all optimisation
-    allread = hmn.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
+    try:
+        #read all fields needed now
+        allread = hmn.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
+    except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
+        logging.warn("All failed to read due to %s" % (str(err)))
+        return ''
+    else:
+        #get demands and temps replacing nones
+        demands = [99 if row is None or row[3] is None else row[3] for row in allread]
+        hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
+        temps = [float(setup.settings['emonsocket']['temperaturenull']) if temp is None else temp for temp in hmn.All.read_air_temp()]
     
-    #get demands and temps replacing nones
-    demands = [99 if row is None or row[3] is None else row[3] for row in allread]
-    hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
-    temps = [-10 if temp is None else temp for temp in hmn.All.read_air_temp()]
+        logging.debug('Temps ' + ' '.join(map(str,temps)))
+        logging.debug('Demands ' + ' '.join(map(str,demands + [hotwater])))
     
-    logging.debug('Temps ' + ' '.join(map(str,temps)))
-    logging.debug('Demands ' + ' '.join(map(str,demands + [hotwater])))
+        #enocde using emonhubs own module
+        encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
     
-    #enocde using emonhubs own module
-    encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
+        #zip temp and demands and join string
+        outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
     
-    #zip temp and demands and join string
-    outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
-    
-    logging.debug(outputstr)
-    return outputstr
+        logging.debug(outputstr)
+        return outputstr
     
 class LocalDatalogger(object):
     """Manages a local daily data logging file."""
@@ -187,7 +188,7 @@ class LocalDatalogger(object):
         """Open new file if the day has changed."""
         daystamp = int(timestamp/86400)
         if self._file_day_stamp != daystamp:
-            self._close_file
+            self._close_file()
             self._open_file(timestamp)
     
     def _open_file(self, timestamp):
@@ -195,9 +196,9 @@ class LocalDatalogger(object):
         self._file_day_stamp = int(timestamp/86400)
         try:
             self._outputfile = open(self._logfolder + "/testlog"+str(self._file_day_stamp)+".txt","ab")
-        except IOError as err:  
+        except IOError as err:
             self._file_day_stamp = False
-            logging.warn('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))            
+            logging.warn('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
     
     def _close_file(self):
         """Close data file."""
@@ -213,7 +214,7 @@ class LocalDatalogger(object):
                 self._outputfile.write(stringout)
             except IOError as err:  
                 self._close_file()
-                logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))          
+                logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
              
 # set up parser with command summary
 parser = argparse.ArgumentParser(
