@@ -182,7 +182,7 @@ while 1:
     encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
     #zip temp and demands and join string
     outputstr2 = ' '.join([hmnode, str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
-    
+
     #print outputstr2
     try:
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

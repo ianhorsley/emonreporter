@@ -94,7 +94,7 @@ def initialise_1wire():
         except ow.exUnknownSensor:
             logging.warn("Sensor gone away during setup")
     logging.info("bus search done - %i sensors found - %i temperature sensors logging - %i sensors missing"%(len(rawlist), n, len(expected_sensors) - n))
-    
+
     return sensorlist
 
 def get_1wire_data():
@@ -108,7 +108,7 @@ def get_1wire_data():
             logging.debug('Sensor ' + str(s) + ' reportied as out of range.')
             T = float(setup.settings['emonsocket']['temperaturenull'])
         else:
-            n = sensorlist1wire.index(s)  # the array register of this sensor
+            #n = sensorlist1wire.index(s)  # the array register of this sensor
             try:  # just in case it has been unplugged
                 T=float(s.temperature)
             except ow.exUnknownSensor:  # it has been unplugged
@@ -212,7 +212,7 @@ class LocalDatalogger(object):
         if not self._file_day_stamp is False:
             try:
                 self._outputfile.write(stringout)
-            except IOError as err:  
+            except IOError as err:
                 self._close_file()
                 logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
              
