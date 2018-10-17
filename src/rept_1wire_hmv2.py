@@ -105,7 +105,7 @@ def get_1wire_data():
     # work through list of sensors
     for s in sensorlist1wire:
         if s is None:
-            logging.debug('Sensor ' + str(s) + ' reportied as out of range.')
+            logging.debug('Sensor ' + str(s) + ' reported as out of range.')
             T = float(setup.settings['emonsocket']['temperaturenull'])
         else:
             #n = sensorlist1wire.index(s)  # the array register of this sensor
@@ -117,7 +117,7 @@ def get_1wire_data():
                 #continue  # so we'll jump to the next in the list
             else:
                 # print sensor name and current value
-                logging.debug( 'Sensor {!s}: {:-6.2f}'.format(s.id,T))
+                logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(s.id,T))
                 stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,s.id,T)
                 datalogger.log(stringout)
 
@@ -168,6 +168,13 @@ def get_heatmiser_data():
         #enocde using emonhubs own module
         encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
     
+        logging.info('Logging heatmiser data')
+        stringout = str(tt)
+        tempstring = ':TEMP' + ','.join(str(tep) for tep in temps)
+        demandsstring = 'DEMAND' + ','.join(str(tep) for tep in demands)
+        hotwaterstring = 'HOTW' + str(hotwater)
+        datalogger.log(stringout + tempstring + demandsstring + hotwaterstring + '\n')
+        
         #zip temp and demands and join string
         outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
     
@@ -180,6 +187,7 @@ class LocalDatalogger(object):
         self._logfolder = logfolder
         
         self._outputfile = None
+        self._openfilename = False
         self._file_day_stamp = False
         
         self._open_file(time.time())
@@ -195,15 +203,21 @@ class LocalDatalogger(object):
         """Open data file and store handle"""
         self._file_day_stamp = int(timestamp/86400)
         try:
-            self._outputfile = open(self._logfolder + "/testlog"+str(self._file_day_stamp)+".txt","ab")
+            self._openfilename = self._logfolder + "/testlog"+str(self._file_day_stamp)+".txt"
+            self._outputfile = open(self._openfilename,"a") #removed b
         except IOError as err:
+            self._openfilename = False
             self._file_day_stamp = False
             logging.warn('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+        else:
+            logging.info('opened file ' + self._openfilename)
     
     def _close_file(self):
         """Close data file."""
         if not self._file_day_stamp is False:
             self._outputfile.close()
+            logging.info('closed file ' + self._openfilename)
+            self._openfilename = False
             self._file_day_stamp = False
     
     def log(self, stringout):
@@ -215,6 +229,8 @@ class LocalDatalogger(object):
             except IOError as err:
                 self._close_file()
                 logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+            else:
+                logging.debug('logged to file:' + stringout)
              
 # set up parser with command summary
 parser = argparse.ArgumentParser(
@@ -259,9 +275,7 @@ while 1:
     tt = int(time.time()) # we only record to integer seconds
 
     logging.info("Logging cyle at " + str(tt))
-    
     outputstr_1wire = get_1wire_data()
-
     outputstr_hmn = get_heatmiser_data()
 
     try:
