@@ -41,9 +41,9 @@ class XmlGetter(object):
         """Does the url contain a downloadable resource?"""
         content_type = header.get('content-type')
         if not 'xml' in content_type.lower():
-            print("File not xml")
-            return False
-        return True
+            #raise FileNotFoundError("File not xml, credetials may be wrong.")
+            raise IOError('file not accessible')
+
     
     @staticmethod
     def _has_changed(header, destfile):
@@ -68,7 +68,9 @@ class XmlGetter(object):
         headers = self._get_headers(url)
         print headers
 
-        if self._is_downloadable(headers) and self._has_changed(headers, destfile):
+        #check if downloadable, and otherwise through exception
+        self._is_downloadable(headers)
+        if self._has_changed(headers, destfile):
 
             response = self._get_file(url)
             print("len ", len(response.content))
