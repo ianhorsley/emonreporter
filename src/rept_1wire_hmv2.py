@@ -83,7 +83,7 @@ def initialise_1wire():
                     logging.info("Sensor, %s, found that will be logged with initial reading %s."%(s, T))
                 else:
                     # log the new sensor
-                    logging.info("New sensor, %s, found that won't be logged."%s)
+                    logging.info("New sensor, %s, found that won't be logged with initial reading %s."%(s, T))
                 # set found sensors to use un-cached results
                 # so will run new conversion every read cycle
                 s.useCache( False )
@@ -121,7 +121,8 @@ def get_1wire_data():
                 stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,s.id,T)
                 datalogger.log(stringout)
 
-        outputstr += ' {:-3.0f}'.format(T*10)
+        #outputstr += ' {:-3.0f}'.format(T*10)
+        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h",T * 10 )))
     
     logging.debug(outputstr)
     return outputstr
@@ -133,15 +134,15 @@ def initialise_heatmiser(localconfigfile=None):
 
     # CYCLE THROUGH ALL CONTROLLERS
     for current_controller in hmn.controllers:
-      logging.info("Getting all data control %2d in %s" % (current_controller.address, current_controller.long_name))
+      logging.info("Getting all data control %2d in %s" % (current_controller.set_address, current_controller.set_long_name))
 
       try:
         current_controller.read_all()
       except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-        logging.warn("C%d in %s Failed to Read due to %s" % (current_controller.address,  current_controller.name.ljust(4), str(err)))
+        logging.warn("C%d in %s Failed to Read due to %s" % (current_controller.set_address,  current_controller.name.ljust(4), str(err)))
       else:
-        disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
-        if current_controller.is_hot_water():
+        disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
+        if current_controller.is_hot_water:
           logging.info("%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand))
         else:
           logging.info(disptext)
@@ -249,7 +250,7 @@ sample_interval=float(args.sample_interval)
 setup, localconfigfile = initialise_setup()
 
 #setup logging
-logging_setup.initialize_logger(setup.settings['logging']['logfolder'], logging.WARN, True)
+logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], logging.WARN)
 
 # tell the user what is happening
 logging.info("1 wire bus reporting and hmstat reporting")
