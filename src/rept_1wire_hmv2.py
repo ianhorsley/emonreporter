@@ -111,14 +111,15 @@ def get_1wire_data():
             #n = sensorlist1wire.index(s)  # the array register of this sensor
             try:  # just in case it has been unplugged
                 T=float(s.temperature)
+                sensorid = s.id
             except ow.exUnknownSensor:  # it has been unplugged
                 logging.warn('Sensor ' + str(s) + ' gone away - ignoring')
                 T = float(setup.settings['emonsocket']['temperaturenull'])
                 #continue  # so we'll jump to the next in the list
             else:
                 # print sensor name and current value
-                logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(s.id,T))
-                stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,s.id,T)
+                logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensorid,T))
+                stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,sensorid,T)
                 datalogger.log(stringout)
 
         #outputstr += ' {:-3.0f}'.format(T*10)
