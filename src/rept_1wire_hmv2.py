@@ -139,10 +139,10 @@ def initialise_heatmiser(localconfigfile=None):
 
       try:
         current_controller.read_all()
+        disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
       except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
         logging.warn("C%d in %s Failed to Read due to %s" % (current_controller.set_address,  current_controller.name.ljust(4), str(err)))
       else:
-        disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
         if current_controller.is_hot_water:
           logging.info("%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand))
         else:
