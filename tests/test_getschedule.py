@@ -3,8 +3,8 @@ import unittest
 import logging
 import os
 
-from src.get_schedule import XmlGetter
-from src.get_config import username, password, url, destfile
+from emonreporter.get_schedule import XmlGetter
+from emonreporter.get_config import username, password, url, destfile
 
 class TestXmlGetter(unittest.TestCase):
     """Low level serial send and recieve message tests"""
