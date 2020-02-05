@@ -283,10 +283,8 @@ while 1:
     try:
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         soc.connect((setup.settings['emonsocket']['host'],int(setup.settings['emonsocket']['port'])))
-        logging.info('socket send %s'%outputstr_1wire)
-        soc.send(outputstr_1wire + '\r\n')
-        logging.info('socket send %s'%outputstr_hmn)
-        soc.send(outputstr_hmn + '\r\n')
+        logging.info('socket send %s and %s'%(outputstr_1wire, outputstr_hmn))
+        logging.debug(soc.sendall(outputstr_1wire + '\r\n' + outputstr_hmn + '\r\n'))
         soc.close()
     except IOError as err:
         logging.warn('could not connect to emonhub due to ' + str(err))
