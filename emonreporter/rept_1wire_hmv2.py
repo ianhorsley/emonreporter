@@ -155,6 +155,8 @@ def get_heatmiser_data():
     try:
         #read all fields needed now
         allread = hmn.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
+        #read currenttime, which will get time from sensor every 24 hours and hence check .
+        hmn.All.read_field('currenttime')
     except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
         logging.warn("All failed to read due to %s" % (str(err)))
         return ''

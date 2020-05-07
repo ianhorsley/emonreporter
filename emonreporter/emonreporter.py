@@ -2,7 +2,7 @@
 
 """EmonReporter
 
-Monitors data sensor network, and sends data to EmonHub 
+Monitors data sensor network, and sends data to EmonHub
 through scoket interface.
 
 Communicates with the user through an ??? EmonHubSetup
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                         help='display version number and exit')
     # Parse arguments
     args = parser.parse_args()
-    
+
     # Display version number and exit
     if args.version:
         print('emonReporter %s' % EmonReporter.__version__)
@@ -269,12 +269,12 @@ if __name__ == "__main__":
     # except ehs.EmonHubSetupInitError as e:
         # logger.critical(e)
         # sys.exit("Unable to load configuration file: " + args.config_file)
- 
+
     # # If in "Show settings" mode, print settings and exit
     # if args.show_settings:
         # setup.check_settings()
         # pprint.pprint(setup.settings)
-    
+
     # Otherwise, create, run, and close EmonHub instance
     # else:
     try:
