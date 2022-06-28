@@ -22,8 +22,8 @@ import logging
 
 import emonhub_coder
 
-# use OWFS module
-import ow
+# use OWFS pyownet module
+import pyownet
 
 # hm imports
 from heatmisercontroller import network, logging_setup
@@ -49,16 +49,15 @@ def initialise_setup(configfile=None):
 
 def initialise_1wire():
     """Initialise 1 wire network and check for sensors"""
-    ### 1 wire setup
     logging.debug("locate sensors and take initial readings:")
     try:
         # connect to localhost port where owserver should be running
-        ow.init(setup.settings['1wire']['owport']);
+        ow = pyownet.protocol.proxy(host='localhost', port=setup.settings['1wire']['owport'])
 
         # list every sensor on the bus added that could be added to the list
-        rawlist = ow.Sensor('/').sensorList()
-    except (ow.exNoController,  ow.exNotInitialized) as err:
-        logging.warn('Could not connect to ow due to %s'%str(err))
+        rawlist = ow.dir()
+    except (pyownet.protocol.Error) as err:
+        logging.warning('Could not connect to ow due to %s'%str(err))
 
     expected_sensors = setup.settings['1wire']['sensors']
     #exError
@@ -69,31 +68,46 @@ def initialise_1wire():
 
     n=0 # initialise number of expected temperature sensors found so far
     logging.info("initialising one wire array")
-    for s in rawlist:
+    
+    try:
+        rawlist = ow.dir()
+        ow.write('simultaneous/temperature', data=b'1')    # begin conversions
+        time.sleep(0.75)                                   # need to wait for conversion
+    except (pyownet.protocol.Error) as err:
+        logging.warning('Could not read list and run concersion on ow due to %s', str(err))
+        
+    for s in expected_sensors:
         try:
-            #logging.info("  considering " + str(s) + ": ")
-            if 'temperature' in s.entryList():
-                # get teh temperature from that sensor
-                T = s.temperature
-                if s._usePath in expected_sensors:
-                    # increment count of sensors detected
+            logging.info("  considering " + str(s) + ": ")
+            if ow.present(s):
+                if ow.present(s + '/latesttemp'):
+                    # get the temperature from that sensor
+                    t = float(ow.read(s + '/latesttemp'))
                     n += 1
-                    # record that as a sensor to interrogate
-                    sensorlist[expected_sensors.index(s._usePath)] = s
-                    logging.info("Sensor, %s, found that will be logged with initial reading %s."%(s, T))
+                    logging.info("Sensor, %s, found that will be logged with initial reading %s.", s, t)
                 else:
-                    # log the new sensor
-                    logging.info("New sensor, %s, found that won't be logged with initial reading %s."%(s, T))
-                # set found sensors to use un-cached results
-                # so will run new conversion every read cycle
-                s.useCache( False )
-                # record the time of reading and value read
+                    # log the non temperature sensors
+                    logging.warning("Expected sensor is a non temperature sensor, %s, found that won't be logged.", s)
+            else:
+                logging.warning("Expected sensor, %s, not found.", s)
+        except pyownet.protocol.Error:
+            logging.warning("Sensor gone away during setup")
+            
+    for s in rawlist:
+        if s[:-1] not in expected_sensors:
+            if ow.present(s[:-1] + '/latesttemp'):
+                # get the temperature from that sensor
+                t = float(ow.read(s + '/latesttemp'))
+                logging.info("New sensor, %s, found that won't be logged with initial reading %s.", s, t)
             else:
                 # log the non temperature sensors
-                logging.warn("Non temperature sensor, %s, found that won't be logged."%s)
-        except ow.exUnknownSensor:
-            logging.warn("Sensor gone away during setup")
-    logging.info("bus search done - %i sensors found - %i temperature sensors logging - %i sensors missing"%(len(rawlist), n, len(expected_sensors) - n))
+                logging.warning("Non temperature sensor, %s, found that won't be logged.", s)
+    
+    
+    logging.info("bus search done - %i sensors found - %i temperature sensors - %i sensors missing",
+                    len(rawlist),
+                    n,
+                    len(expected_sensors) - n)
 
     return sensorlist
 
@@ -113,7 +127,7 @@ def get_1wire_data():
                 T=float(s.temperature)
                 sensorid = s.id
             except ow.exUnknownSensor:  # it has been unplugged
-                logging.warn('Sensor ' + str(s) + ' gone away - ignoring')
+                logging.warning('Sensor ' + str(s) + ' gone away - ignoring')
                 T = float(setup.settings['emonsocket']['temperaturenull'])
                 #continue  # so we'll jump to the next in the list
             else:
@@ -141,7 +155,7 @@ def initialise_heatmiser(localconfigfile=None):
         current_controller.read_all()
         disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
       except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-        logging.warn("C%d in %s Failed to Read due to %s" % (current_controller.set_address,  current_controller.name.ljust(4), str(err)))
+        logging.warning("C%d in %s Failed to Read due to %s" % (current_controller.set_address,  current_controller.name.ljust(4), str(err)))
       else:
         if current_controller.is_hot_water:
           logging.info("%s Hot Water Demand %d" % (disptext, current_controller.hotwaterdemand))
@@ -158,7 +172,7 @@ def get_heatmiser_data():
         #read currenttime, which will get time from sensor every 24 hours and hence check .
         hmn.All.read_field('currenttime')
     except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-        logging.warn("All failed to read due to %s" % (str(err)))
+        logging.warning("All failed to read due to %s" % (str(err)))
         return ''
     else:
         #get demands and temps replacing nones
@@ -212,7 +226,7 @@ class LocalDatalogger(object):
         except IOError as err:
             self._openfilename = False
             self._file_day_stamp = False
-            logging.warn('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+            logging.warning('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
         else:
             logging.info('opened file ' + self._openfilename)
     
@@ -232,7 +246,7 @@ class LocalDatalogger(object):
                 self._outputfile.write(stringout)
             except IOError as err:
                 self._close_file()
-                logging.warn('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+                logging.warning('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
             else:
                 logging.debug('logged to file:' + stringout)
              
@@ -289,4 +303,4 @@ while 1:
         logging.debug(soc.sendall(outputstr_1wire + '\r\n' + outputstr_hmn + '\r\n'))
         soc.close()
     except IOError as err:
-        logging.warn('could not connect to emonhub due to ' + str(err))
+        logging.warning('could not connect to emonhub due to ' + str(err))
