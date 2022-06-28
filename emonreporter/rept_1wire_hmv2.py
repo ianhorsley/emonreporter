@@ -101,18 +101,19 @@ def _check_sensor(net, name, type):
     try:
         if net.present(name + '/latesttemp'):
             # get the temperature from that sensor
-            t = float(net.read(name + '/latesttemp'))
-            logging.info("%s sensor, %s, found that will be logged with initial reading %s.",
-                            type, name, t)
-            return 1
+            temp = float(net.read(name + '/latesttemp'))
+            logging.info("%s sensor, %s, found with initial reading %s.",
+                            type, name, temp)
         else:
             # log the non temperature sensors
-            logging.warning("%s sensor, %s, is a non temperature sensor found that won't be logged.",
+            logging.warning("%s sensor, %s, is a non temperature sensor that won't be logged.",
                                 type, name)
             return 0
     except pyownet.protocol.Error:
         logging.warning("%s sensor, %s, went away during setup.", type, name)
         return 0
+    
+    return 1
 
 def get_1wire_data():
     """Get data from 1 wire network and and return formatted string"""
@@ -144,7 +145,7 @@ def get_1wire_data():
             stringout = '{}:{!s}:{:+06.2f}\n'.format(tt, sensor, temp)
             datalogger.log(stringout)
 
-        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", t * 10 )))
+        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", temp * 10 )))
     
     logging.debug(outputstr)
     
@@ -307,7 +308,7 @@ while 1:
     
     output_message = ""
     
-    logging.info("Logging cyle at " + str(tt))
+    logging.info("Logging cyle at %n", tt)
     outputstr_1wire = get_1wire_data()
     if outputstr_1wire is not None:
         output_message += outputstr_1wire + '\r\n'
@@ -317,9 +318,10 @@ while 1:
     if len(output_message > 0):
         try:
             soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            soc.connect((setup.settings['emonsocket']['host'],int(setup.settings['emonsocket']['port'])))
-            logging.info('socket send %s and %s'%(outputstr_1wire, outputstr_hmn))
+            soc.connect((setup.settings['emonsocket']['host'],
+                            int(setup.settings['emonsocket']['port'])))
+            logging.info('socket send %s and %s', outputstr_1wire, outputstr_hmn)
             logging.debug(soc.sendall(output_message))
             soc.close()
         except IOError as err:
-            logging.warning('could not connect to emonhub due to ' + str(err))
+            logging.warning('could not connect to emonhub due to %s', err)
