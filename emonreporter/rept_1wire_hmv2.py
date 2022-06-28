@@ -58,23 +58,22 @@ def initialise_1wire():
         rawlist = ow.dir()
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not connect to ow due to %s'%str(err))
+        return []
 
     expected_sensors = setup.settings['1wire']['sensors']
     #exError
     #exNotInitialized, exUnknownSensor
 
-    # create lists for the data we will report
-    sensorlist=[None] * len(expected_sensors)
-
     n=0 # initialise number of expected temperature sensors found so far
     logging.info("initialising one wire array")
-    
+
     try:
         rawlist = ow.dir()
         ow.write('simultaneous/temperature', data=b'1')    # begin conversions
         time.sleep(0.75)                                   # need to wait for conversion
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not read list and run concersion on ow due to %s', str(err))
+        return []
         
     for s in expected_sensors:
         try:
@@ -108,44 +107,58 @@ def initialise_1wire():
                     len(rawlist),
                     n,
                     len(expected_sensors) - n)
-
-    return sensorlist
+    
+    if n > 0:
+        return expected_sensors
+    else:
+        return []
 
 def get_1wire_data():
     """Get data from 1 wire network and and return formatted string"""
     #reset output string
     outputstr = setup.settings['emonsocket']['node']
 
+    try:
+        ow.write('simultaneous/temperature', data=b'1')    # begin conversions
+        time.sleep(0.75)                                   # need to wait for conversion
+    except (pyownet.protocol.Error) as err:
+        logging.warning('Could not read list and run concersion on ow due to %s', str(err))
+        return None
+
+    n = 0 #count results
+
     # work through list of sensors
     for s in sensorlist1wire:
-        if s is None:
-            logging.debug('Sensor ' + str(s) + ' reported as out of range.')
-            T = float(setup.settings['emonsocket']['temperaturenull'])
+        try:  # just in case it has been unplugged
+            # get the temperature from that sensor
+            t = float(ow.read(s + '/latesttemp'))
+            n += 1
+        except pyownet.protocol.Error:  # it has been unplugged
+            logging.warning('Sensor ' + str(s) + ' gone away - ignoring')
+            t = float(setup.settings['emonsocket']['temperaturenull'])
+            #continue  # so we'll jump to the next in the list
         else:
-            #n = sensorlist1wire.index(s)  # the array register of this sensor
-            try:  # just in case it has been unplugged
-                T=float(s.temperature)
-                sensorid = s.id
-            except ow.exUnknownSensor:  # it has been unplugged
-                logging.warning('Sensor ' + str(s) + ' gone away - ignoring')
-                T = float(setup.settings['emonsocket']['temperaturenull'])
-                #continue  # so we'll jump to the next in the list
-            else:
-                # print sensor name and current value
-                logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensorid,T))
-                stringout = '{}:{!s}:{:+06.2f}\n'.format(tt,sensorid,T)
-                datalogger.log(stringout)
+            # print sensor name and current value
+            logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(s, t))
+            stringout = '{}:{!s}:{:+06.2f}\n'.format(tt, s, t)
+            datalogger.log(stringout)
 
         #outputstr += ' {:-3.0f}'.format(T*10)
-        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h",T * 10 )))
+        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", t * 10 )))
     
     logging.debug(outputstr)
-    return outputstr
+    
+    if n == 0:
+        return None
+    return outputstr 
     
 def initialise_heatmiser(localconfigfile=None):
     """Initialise heatmiser network and check for sensors"""
     logging.info("initialising hm network")
-    hmn = network.HeatmiserNetwork(localconfigfile)
+    try:
+        hmn = network.HeatmiserNetwork(localconfigfile)
+    except HeatmiserResponseError:
+        return None
 
     # CYCLE THROUGH ALL CONTROLLERS
     for current_controller in hmn.controllers:
@@ -291,16 +304,22 @@ while 1:
 
     # get time now and record it
     tt = int(time.time()) # we only record to integer seconds
-
+    
+    output_message = ""
+    
     logging.info("Logging cyle at " + str(tt))
     outputstr_1wire = get_1wire_data()
+    if outputstr_1wire is not None:
+        output_message += outputstr_1wire + '\r\n'
     outputstr_hmn = get_heatmiser_data()
+    output_message += outputstr_hmn + '\r\n'
 
-    try:
-        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        soc.connect((setup.settings['emonsocket']['host'],int(setup.settings['emonsocket']['port'])))
-        logging.info('socket send %s and %s'%(outputstr_1wire, outputstr_hmn))
-        logging.debug(soc.sendall(outputstr_1wire + '\r\n' + outputstr_hmn + '\r\n'))
-        soc.close()
-    except IOError as err:
-        logging.warning('could not connect to emonhub due to ' + str(err))
+    if len(output_message > 0):
+        try:
+            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            soc.connect((setup.settings['emonsocket']['host'],int(setup.settings['emonsocket']['port'])))
+            logging.info('socket send %s and %s'%(outputstr_1wire, outputstr_hmn))
+            logging.debug(soc.sendall(output_message))
+            soc.close()
+        except IOError as err:
+            logging.warning('could not connect to emonhub due to ' + str(err))
