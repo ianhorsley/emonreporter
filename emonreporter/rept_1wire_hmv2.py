@@ -89,7 +89,7 @@ def initialise_1wire():
         if sensor[:-1] not in expected_sensors:
             _check_sensor(ownet, sensor[:-1], "New")
     
-    logging.info("bus search done - %i sensors found - %i temperature sensors - %i sensors missing",
+    logging.info("bus search done for sensors - %i found - %i temperature - %i missing",
                     len(rawlist),
                     found_sensors,
                     len(expected_sensors) - found_sensors)
@@ -166,7 +166,8 @@ def initialise_heatmiser(configfile=None):
 
     # CYCLE THROUGH ALL CONTROLLERS
     for current_controller in hm_network.controllers:
-        logging.info("Getting all data control %2d in %s", current_controller.set_address, current_controller.set_long_name)
+        logging.info("Getting all data control %2d in %s",
+                        current_controller.set_address, current_controller.set_long_name)
 
         try:
             current_controller.read_all()
@@ -202,7 +203,8 @@ def get_heatmiser_data():
         #get demands and temps replacing nones
         demands = [99 if row is None or row[3] is None else row[3] for row in allread]
         hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
-        temps = [float(setup.settings['emonsocket']['temperaturenull']) if temp is None else temp for temp in hmn.All.read_air_temp()]
+        temps = [float(setup.settings['emonsocket']['temperaturenull']) 
+                    if temp is None else temp for temp in hmn.All.read_air_temp()]
     
         logging.debug('Temps ' + ' '.join(map(str,temps)))
         logging.debug('Demands ' + ' '.join(map(str,demands + [hotwater])))
@@ -251,15 +253,16 @@ class LocalDatalogger(object):
         except IOError as err:
             self._openfilename = False
             self._file_day_stamp = False
-            logging.warning('failed to create log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+            logging.warning('failed to create log file : I/O error(%d): %s',
+                                err.errno, err.strerror)
         else:
-            logging.info('opened file ' + self._openfilename)
+            logging.info('opened file %s', self._openfilename)
     
     def _close_file(self):
         """Close data file."""
         if not self._file_day_stamp is False:
             self._outputfile.close()
-            logging.info('closed file ' + self._openfilename)
+            logging.info('closed file %s', self._openfilename)
             self._openfilename = False
             self._file_day_stamp = False
     
@@ -271,7 +274,8 @@ class LocalDatalogger(object):
                 self._outputfile.write(stringout)
             except IOError as err:
                 self._close_file()
-                logging.warning('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
+                logging.warning('failed to write to log file : I/O error(%d): %s',
+                                    err.errno, err.strerror)
             else:
                 logging.debug('logged to file: %s', stringout)
              
@@ -319,7 +323,7 @@ while 1:
     
     output_message = ""
     
-    logging.info("Logging cyle at %n", tt)
+    logging.info("Logging cyle at %d", tt)
     outputstr_1wire = get_1wire_data(onewirenetwork, sensorlist1wire)
     if outputstr_1wire is not None:
         output_message += outputstr_1wire + '\r\n'
