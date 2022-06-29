@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# program to interogate 1-wire bus and report all known temperatures
+""" program to interogate 1-wire bus and report all known temperatures
 # with some commentary
 
 # by ian
@@ -10,7 +10,7 @@
 # updated to add more error catching and remove trend code
 
 # /lib/systemd/system/1wireemon.service
-# /home/pi/data/emonhub.conf
+# /home/pi/data/emonhub.conf"""
 
 # standard library modules used in code
 from __future__ import absolute_import
@@ -22,11 +22,10 @@ import time
 import argparse
 import socket
 import logging
+from serial import SerialException
+import pyownet # use OWFS pyownet module
 
 import emonhub_coder
-
-# use OWFS pyownet module
-import pyownet
 
 # hm imports
 from heatmisercontroller import network, logging_setup
@@ -88,7 +87,7 @@ def initialise_1wire():
     for sensor in rawlist:
         if sensor[:-1] not in expected_sensors:
             _check_sensor(ownet, sensor[:-1], "New")
-    
+
     logging.info("bus search done for sensors - %i found - %i temperature - %i missing",
                     len(rawlist),
                     found_sensors,
@@ -128,7 +127,7 @@ def get_1wire_data(ownet, expected_sensors):
         time.sleep(0.75)                                   # need to wait for conversion
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not read list and run concersion on ow due to %s', str(err))
-        return None
+        return ''
 
     result_count = 0 #count results
 
@@ -145,23 +144,23 @@ def get_1wire_data(ownet, expected_sensors):
         else:
             # print sensor name and current value
             logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensor, temp))
-            stringout = '{}:{!s}:{:+06.2f}\n'.format(tt, sensor, temp)
+            stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time, sensor, temp)
             datalogger.log(stringout)
 
-        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", temp * 10 )))
+        outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", round(temp * 10 ))))
 
     logging.debug(outputstr)
 
     if result_count == 0:
-        return None
-    return outputstr 
+        return ''
+    return outputstr + '\r\n'
     
 def initialise_heatmiser(configfile=None):
     """Initialise heatmiser network and check for sensors"""
     logging.info("initialising hm network")
     try:
         hm_network = network.HeatmiserNetwork(configfile)
-    except HeatmiserResponseError:
+    except (SerialException, HeatmiserResponseError):
         return None
 
     # CYCLE THROUGH ALL CONTROLLERS
@@ -196,7 +195,7 @@ def get_heatmiser_data():
                                         'hotwaterdemand'], 0)
         #read currenttime, which will get time from sensor every 24 hours and hence check .
         hmn.All.read_field('currenttime')
-    except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
+    except (SerialException, HeatmiserResponseError, HeatmiserControllerTimeError) as err:
         logging.warning("All failed to read due to %s", str(err))
         return ''
     else:
@@ -213,7 +212,7 @@ def get_heatmiser_data():
         encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
     
         logging.info('Logging heatmiser data')
-        stringout = str(tt)
+        stringout = str(read_time)
         tempstring = ':TEMP' + ','.join(str(tep) for tep in temps)
         demandsstring = 'DEMAND' + ','.join(str(tep) for tep in demands)
         hotwaterstring = 'HOTW' + str(hotwater)
@@ -224,7 +223,7 @@ def get_heatmiser_data():
                                 + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
     
         logging.debug(outputstr)
-        return outputstr
+        return outputstr + '\r\n'
     
 class LocalDatalogger(object):
     """Manages a local daily data logging file."""
@@ -278,7 +277,7 @@ class LocalDatalogger(object):
                                     err.errno, err.strerror)
             else:
                 logging.debug('logged to file: %s', stringout)
-             
+
 # set up parser with command summary
 parser = argparse.ArgumentParser(
         description='Rolling 1-wire temperatures report')
@@ -319,24 +318,23 @@ while 1:
     time.sleep(sleeptime)
 
     # get time now and record it
-    tt = int(time.time()) # we only record to integer seconds
+    read_time = int(time.time()) # we only record to integer seconds
     
-    output_message = ""
+    output_message = ''
     
-    logging.info("Logging cyle at %d", tt)
-    outputstr_1wire = get_1wire_data(onewirenetwork, sensorlist1wire)
-    if outputstr_1wire is not None:
-        output_message += outputstr_1wire + '\r\n'
-    outputstr_hmn = get_heatmiser_data()
-    output_message += outputstr_hmn + '\r\n'
+    logging.info("Logging cyle at %d", read_time)
+    output_message += get_1wire_data(onewirenetwork, sensorlist1wire)
+    
+    if hmn is not None:
+        output_message += get_heatmiser_data()
 
-    if len(output_message > 0):
+    if len(output_message) > 0:
         try:
             soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             soc.connect((setup.settings['emonsocket']['host'],
                             int(setup.settings['emonsocket']['port'])))
-            logging.info('socket send %s and %s', outputstr_1wire, outputstr_hmn)
-            logging.debug(soc.sendall(output_message))
+            logging.info('socket send %s', output_message)
+            logging.debug(soc.sendall(output_message.encode('utf-8')))
             soc.close()
         except IOError as err:
             logging.warning('could not connect to emonhub due to %s', err)

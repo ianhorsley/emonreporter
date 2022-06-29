@@ -7,33 +7,28 @@ Provides functions to code and decode data being sent to emonhub.
 from __future__ import absolute_import
 import struct
 
-# Initialize nodes data
-nodelist = {}
+# Ensure little-endian & standard sizes used
+ENDIAN_TYPE = '<'
 
+# set the base data type to bytes
+BASE_TYPE = 'B'
+
+# Data types & sizes (number of bytes)
+DATA_CODES = {'b': '1', 'h': '2', 'i': '4', 'l': '4', 'q': '8', 'f': '4', 'd': '8',
+             'B': '1', 'H': '2', 'I': '4', 'L': '4', 'Q': '8', 'c': '1', '?': '1'}
 
 def check_datacode(datacode):
     """Check that data code is in the valid list"""
-    
-    # Data types & sizes (number of bytes)
-    datacodes = {'b': '1', 'h': '2', 'i': '4', 'l': '4', 'q': '8', 'f': '4', 'd': '8',
-                 'B': '1', 'H': '2', 'I': '4', 'L': '4', 'Q': '8', 'c': '1', '?': '1'}
 
     # if datacode is valid return the data size in bytes
-    if datacode in datacodes:
-        return int(datacodes[datacode])
+    if datacode in DATA_CODES:
+        return int(DATA_CODES[datacode])
 
     # if not valid return False
     return False
 
-
 def decode(datacode, frame):
     """decode a emonhub data frame"""
-    
-    # Ensure little-endian & standard sizes used
-    ENDIAN_TYPE = '<'
-
-    # set the base data type to bytes
-    BASE_TYPE = 'B'
 
     # get data size from data code
     data_size = int(check_datacode(datacode))
@@ -44,12 +39,6 @@ def decode(datacode, frame):
 
 def encode(datacode, value):
     """encode data in to an emonhub frame"""
-
-    # Ensure little-endian & standard sizes used
-    ENDIAN_TYPE = '<'
-
-    # set the base data type to bytes
-    BASE_TYPE = 'B'
 
     # get data size from data code
     data_size = int(check_datacode(datacode))
