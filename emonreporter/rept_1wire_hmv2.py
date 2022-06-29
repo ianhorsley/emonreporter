@@ -14,6 +14,7 @@
 
 # standard library modules used in code
 from __future__ import absolute_import
+from __future__ import division
 
 import sys
 import os
@@ -98,21 +99,21 @@ def initialise_1wire():
 
     return ownet, expected_sensors
 
-def _check_sensor(net, name, type):
+def _check_sensor(ownetobj, name, type_label):
     """Check whether sensor is temperature or not"""
     try:
-        if net.present(name + '/latesttemp'):
+        if ownetobj.present(name + '/latesttemp'):
             # get the temperature from that sensor
-            temp = float(net.read(name + '/latesttemp'))
+            temp = float(ownetobj.read(name + '/latesttemp'))
             logging.info("%s sensor, %s, found with initial reading %s.",
-                            type, name, temp)
+                            type_label, name, temp)
         else:
             # log the non temperature sensors
             logging.warning("%s sensor, %s, is a non temperature sensor that won't be logged.",
-                                type, name)
+                                type_label, name)
             return 0
     except pyownet.protocol.Error:
-        logging.warning("%s sensor, %s, went away during setup.", type, name)
+        logging.warning("%s sensor, %s, went away during setup.", type_label, name)
         return 0
     
     return 1
@@ -236,14 +237,14 @@ class LocalDatalogger(object):
     
     def _check_day(self, timestamp):
         """Open new file if the day has changed."""
-        daystamp = int(timestamp/86400)
+        daystamp = timestamp//86400
         if self._file_day_stamp != daystamp:
             self._close_file()
             self._open_file(timestamp)
     
     def _open_file(self, timestamp):
         """Open data file and store handle"""
-        self._file_day_stamp = int(timestamp/86400)
+        self._file_day_stamp = timestamp//86400
         try:
             self._openfilename = self._logfolder + "/testlog"+str(self._file_day_stamp)+".txt"
             self._outputfile = open(self._openfilename,"a") #removed b
