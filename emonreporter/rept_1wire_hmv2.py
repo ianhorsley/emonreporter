@@ -13,6 +13,8 @@
 # /home/pi/data/emonhub.conf
 
 # standard library modules used in code
+from __future__ import absolute_import
+
 import sys
 import os
 import time
@@ -74,7 +76,7 @@ def initialise_1wire():
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not read list and run concersion on ow due to %s', str(err))
         return []
-        
+
     for sensor in expected_sensors:
         #logging.info("  considering " + str(s) + ": ")
         if ownet.present(sensor):
@@ -94,7 +96,7 @@ def initialise_1wire():
     if found_sensors == 0:
         return []
 
-    return expected_sensors
+    return ownet, expected_sensors
 
 def _check_sensor(net, name, type):
     """Check whether sensor is temperature or not"""
@@ -115,7 +117,7 @@ def _check_sensor(net, name, type):
     
     return 1
 
-def get_1wire_data():
+def get_1wire_data(ownet, expected_sensors):
     """Get data from 1 wire network and and return formatted string"""
     #reset output string
     outputstr = setup.settings['emonsocket']['node']
@@ -130,7 +132,7 @@ def get_1wire_data():
     result_count = 0 #count results
 
     # work through list of sensors
-    for sensor in sensorlist1wire:
+    for sensor in expected_sensors:
         try:  # just in case it has been unplugged
             # get the temperature from that sensor
             temp = float(ownet.read(sensor + '/latesttemp'))
@@ -146,47 +148,54 @@ def get_1wire_data():
             datalogger.log(stringout)
 
         outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", temp * 10 )))
-    
+
     logging.debug(outputstr)
-    
+
     if result_count == 0:
         return None
     return outputstr 
     
-def initialise_heatmiser(localconfigfile=None):
+def initialise_heatmiser(configfile=None):
     """Initialise heatmiser network and check for sensors"""
     logging.info("initialising hm network")
     try:
-        hmn = network.HeatmiserNetwork(localconfigfile)
+        hm_network = network.HeatmiserNetwork(configfile)
     except HeatmiserResponseError:
         return None
 
     # CYCLE THROUGH ALL CONTROLLERS
-    for current_controller in hmn.controllers:
+    for current_controller in hm_network.controllers:
         logging.info("Getting all data control %2d in %s", current_controller.set_address, current_controller.set_long_name)
 
         try:
             current_controller.read_all()
             disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
         except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-            logging.warning("C%d in %s Failed to Read due to %s", current_controller.set_address,  current_controller.name.ljust(4), str(err))
+            logging.warning("C%d in %s Failed to Read due to %s",
+                                current_controller.set_address,
+                                current_controller.name.ljust(4),
+                                str(err))
         else:
             if current_controller.is_hot_water:
                 logging.info("%s Hot Water Demand %d", disptext, current_controller.hotwaterdemand)
             else:
                 logging.info(disptext)
           
-    return hmn
+    return hm_network
 
 def get_heatmiser_data():
     """Get data from heatmiser network and and return formatted string"""
     try:
         #read all fields needed now
-        allread = hmn.All.read_fields(['sensorsavaliable','airtemp','remoteairtemp','heatingdemand','hotwaterdemand'], 0)
+        allread = hmn.All.read_fields(['sensorsavaliable',
+                                        'airtemp',
+                                        'remoteairtemp',
+                                        'heatingdemand',
+                                        'hotwaterdemand'], 0)
         #read currenttime, which will get time from sensor every 24 hours and hence check .
         hmn.All.read_field('currenttime')
     except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-        logging.warning("All failed to read due to %s" % (str(err)))
+        logging.warning("All failed to read due to %s", str(err))
         return ''
     else:
         #get demands and temps replacing nones
@@ -208,7 +217,8 @@ def get_heatmiser_data():
         datalogger.log(stringout + tempstring + demandsstring + hotwaterstring + '\n')
         
         #zip temp and demands and join string
-        outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)] + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
+        outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)]
+                                + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
     
         logging.debug(outputstr)
         return outputstr
@@ -262,7 +272,7 @@ class LocalDatalogger(object):
                 self._close_file()
                 logging.warning('failed to write to log file : I/O error({0}): {1}'.format(err.errno, err.strerror))
             else:
-                logging.debug('logged to file:' + stringout)
+                logging.debug('logged to file: %s', stringout)
              
 # set up parser with command summary
 parser = argparse.ArgumentParser(
@@ -285,9 +295,9 @@ logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], log
 
 # tell the user what is happening
 logging.info("1 wire bus reporting and hmstat reporting")
-logging.info("  sample interval: "+str(sample_interval) + " seconds")
+logging.info("  sample interval: %d seconds", sample_interval )
 
-sensorlist1wire = initialise_1wire()
+onewirenetwork, sensorlist1wire = initialise_1wire()
 
 hmn = initialise_heatmiser(localconfigfile)
 
@@ -309,7 +319,7 @@ while 1:
     output_message = ""
     
     logging.info("Logging cyle at %n", tt)
-    outputstr_1wire = get_1wire_data()
+    outputstr_1wire = get_1wire_data(onewirenetwork, sensorlist1wire)
     if outputstr_1wire is not None:
         output_message += outputstr_1wire + '\r\n'
     outputstr_hmn = get_heatmiser_data()
