@@ -1,4 +1,5 @@
 """Build setup for package"""
+from __future__ import absolute_import
 from setuptools import setup
 
 def readme():
@@ -8,7 +9,7 @@ def readme():
 
 setup(name='emonreporter',
       version='0.41',
-      description='Python implementation to process room temperatures and apply to Heatmiser network ',
+      description='Python scripts to process room temperatures and apply to Heatmiser network.',
       long_description=readme(),
       classifiers=[
         'Programming Language :: Python :: 2.7',

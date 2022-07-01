@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 
 import sys
-import os
 import time
 import argparse
 import socket
@@ -25,12 +24,12 @@ import logging
 from serial import SerialException
 import pyownet # use OWFS pyownet module
 
-import emonhub_coder
-
 # hm imports
 from heatmisercontroller import network, logging_setup
 from heatmisercontroller.exceptions import HeatmiserResponseError, HeatmiserControllerTimeError
 import heatmisercontroller.setup as hms
+
+import emonhub_coder
 
 def initialise_setup(configfile):
     """Initialise setup loading configuration file."""
@@ -87,7 +86,7 @@ def initialise_1wire():
                     len(rawlist),
                     found_sensors,
                     len(expected_sensors) - found_sensors)
-    
+
     if found_sensors == 0:
         return []
 
@@ -199,27 +198,27 @@ def get_heatmiser_data():
         hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
         temps = [float(setup.settings['emonsocket']['temperaturenull']) 
                     if temp is None else temp for temp in hmn.All.read_air_temp()]
-    
-        logging.debug('Temps ' + ' '.join(map(str,temps)))
-        logging.debug('Demands ' + ' '.join(map(str,demands + [hotwater])))
-    
+
+        logging.debug('Temps %s', temps)
+        logging.debug('Demands %s', demands + [hotwater])
+
         #enocde using emonhubs own module
         encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
-    
+
         logging.info('Logging heatmiser data')
         stringout = str(read_time)
         tempstring = ':TEMP' + ','.join(str(tep) for tep in temps)
         demandsstring = 'DEMAND' + ','.join(str(tep) for tep in demands)
         hotwaterstring = 'HOTW' + str(hotwater)
         datalogger.log(stringout + tempstring + demandsstring + hotwaterstring + '\n')
-        
+
         #zip temp and demands and join string
         outputstr = ' '.join([setup.settings['emonsocket']['hmnode'], str(hotwater)]
                                 + ['%s %d'%pair for pair in zip(encodedtemps, demands)])
-    
+
         logging.debug(outputstr)
         return outputstr + '\r\n'
-    
+
 class LocalDatalogger(object):
     """Manages a local daily data logging file."""
     def __init__(self, logfolder):
