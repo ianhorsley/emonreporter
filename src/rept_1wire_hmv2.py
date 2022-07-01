@@ -32,13 +32,8 @@ from heatmisercontroller import network, logging_setup
 from heatmisercontroller.exceptions import HeatmiserResponseError, HeatmiserControllerTimeError
 import heatmisercontroller.setup as hms
 
-def initialise_setup(configfile=None):
+def initialise_setup(configfile):
     """Initialise setup loading configuration file."""
-
-    # Select default configuration file if none provided
-    if configfile is None:
-        module_path = os.path.abspath(os.path.dirname(__file__))
-        configfile = os.path.join(module_path, "../conf/reporter.conf")
 
     # Initialize controller setup
     try:
@@ -278,63 +273,72 @@ class LocalDatalogger(object):
             else:
                 logging.debug('logged to file: %s', stringout)
 
-# set up parser with command summary
-parser = argparse.ArgumentParser(
-        description='Rolling 1-wire temperatures report')
-# set up arguments with associated help and defaults
-parser.add_argument('-i',
-        dest='sample_interval',
-        help='interval in seconds between samples',
-        default='30')
+if __name__ == "__main__":
+
+    # set up parser with command summary
+    parser = argparse.ArgumentParser(
+            description='Rolling 1-wire and heatmiser temperatures report')
+    # set up arguments with associated help and defaults
+    parser.add_argument('-i',
+            dest='sample_interval',
+            help='interval in seconds between samples',
+            default='30')
+    # Configuration file
+    parser.add_argument("--config-file", action="store",
+                        help='Configuration file', default=sys.path[0] + '/../conf/reporter.conf')
+    # Log file
+    parser.add_argument('--logfile', action='store', type=argparse.FileType('a'),
+                        help='Log file (default: log to Standard error stream STDERR)')
+            
+    # process the arguments
+    args=parser.parse_args()
+    
+    # turn the arguments into numbers
+    sample_interval=float(args.sample_interval)
+
+    setup, localconfigfile = initialise_setup(args.config_file)
+
+    #setup logging
+    logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], logging.WARN)
+
+    # tell the user what is happening
+    logging.info("1 wire bus reporting and hmstat reporting")
+    logging.info("  sample interval: %d seconds", sample_interval )
+
+    onewirenetwork, sensorlist1wire = initialise_1wire()
+
+    hmn = initialise_heatmiser(localconfigfile)
+
+    datalogger = LocalDatalogger(setup.settings['logging']['logfolder'])
+
+    logging.info("Entering reading loop")
+
+    # now loop forever reading the identified sensors
+    while 1:
+        # determine how long to wait until next interval
+        # note this will skip some if specified interval is too short
+        #  - it finds the next after now, not next after last
+        sleeptime = sample_interval - (time.time() % sample_interval)
+        time.sleep(sleeptime)
+
+        # get time now and record it
+        read_time = int(time.time()) # we only record to integer seconds
         
-# process the arguments
-args=parser.parse_args()
-# turn the arguments into numbers
-sample_interval=float(args.sample_interval)
+        output_message = ''
+        
+        logging.info("Logging cyle at %d", read_time)
+        output_message += get_1wire_data(onewirenetwork, sensorlist1wire)
+        
+        if hmn is not None:
+            output_message += get_heatmiser_data()
 
-setup, localconfigfile = initialise_setup()
-
-#setup logging
-logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], logging.WARN)
-
-# tell the user what is happening
-logging.info("1 wire bus reporting and hmstat reporting")
-logging.info("  sample interval: %d seconds", sample_interval )
-
-onewirenetwork, sensorlist1wire = initialise_1wire()
-
-hmn = initialise_heatmiser(localconfigfile)
-
-datalogger = LocalDatalogger(setup.settings['logging']['logfolder'])
-
-logging.info("Entering reading loop")
-
-# now loop forever reading the identified sensors
-while 1:
-    # determine how long to wait until next interval
-    # note this will skip some if specified interval is too short
-    #  - it finds the next after now, not next after last
-    sleeptime = sample_interval - (time.time() % sample_interval)
-    time.sleep(sleeptime)
-
-    # get time now and record it
-    read_time = int(time.time()) # we only record to integer seconds
-    
-    output_message = ''
-    
-    logging.info("Logging cyle at %d", read_time)
-    output_message += get_1wire_data(onewirenetwork, sensorlist1wire)
-    
-    if hmn is not None:
-        output_message += get_heatmiser_data()
-
-    if len(output_message) > 0:
-        try:
-            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            soc.connect((setup.settings['emonsocket']['host'],
-                            int(setup.settings['emonsocket']['port'])))
-            logging.info('socket send %s', output_message)
-            logging.debug(soc.sendall(output_message.encode('utf-8')))
-            soc.close()
-        except IOError as err:
-            logging.warning('could not connect to emonhub due to %s', err)
+        if len(output_message) > 0:
+            try:
+                soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                soc.connect((setup.settings['emonsocket']['host'],
+                                int(setup.settings['emonsocket']['port'])))
+                logging.info('socket send %s', output_message)
+                logging.debug(soc.sendall(output_message.encode('utf-8')))
+                soc.close()
+            except IOError as err:
+                logging.warning('could not connect to emonhub due to %s', err)
