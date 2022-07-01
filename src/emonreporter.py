@@ -8,7 +8,7 @@ through scoket interface.
 Communicates with the user through an ??? EmonHubSetup
 
 """
-
+from __future__ import absolute_import
 import sys
 # import time
 import logging
@@ -23,11 +23,12 @@ import argparse
 # import emonhub_interfacer as ehi
 # import emonhub_coder as ehc
 
-class EmonReporter(object):
-    
+class EmonReporter():
+    """Reports heatmiser information to EmonHub"""
+
     __version__ = 'Development Version (rc0.1)'
-    
-    def __init__(self, setup):
+
+    def __init__(self, setup_init):
         """Setup an emonReporter.
         
         Interface (EmonHubSetup): User interface to the hub.
@@ -38,21 +39,21 @@ class EmonReporter(object):
         self._exit = False
 
         # Initialize setup and get settings
-        #self._setup = setup
-        #settings = self._setup.settings
-        
+        self._setup = setup_init
+        settings = self._setup.settings
+
         # socket config for emon connection
         self._host = 'localhost'
         self._port = 50011
         self._node = '18' # for 1 wire bus
         self._hmnode = '27' # for hm stat reporting
-        
+
         self._sample_interval = 30
-        
+
         # Initialize logging
         self._log = logging.getLogger("EmonReporter")
         self._set_logging_level('INFO', False)
-        self._log.info("EmonReporter %s" % self.__version__)
+        self._log.info("EmonReporter %s", self.__version__)
         self._log.info("Opening reporter...")
         
         # Initialize Interfacers
@@ -115,7 +116,7 @@ class EmonReporter(object):
         self._log.info("Exit completed")
         logging.shutdown()
 
-    def _sigint_handler(self, signal, frame):
+    def _sigint_handler(self, signal_internal, frame):
         """Catch SIGINT (Ctrl+C)."""
         
         self._log.debug("SIGINT received.")
@@ -137,8 +138,8 @@ class EmonReporter(object):
 
         # Interfacers
         for name in self._interfacers.keys():
-            # Delete interfacers if not listed or have no 'Type' in the settings without further checks
-            # (This also provides an ability to delete & rebuild by commenting 'Type' in conf)
+            #Delete interfacers not listed or have no 'Type' in the settings without further checks
+            #(This also provides an ability to delete & rebuild by commenting 'Type' in conf)
             if not name in settings['interfacers'] or not 'Type' in settings['interfacers'][name]:
                 pass
             else:
@@ -146,18 +147,18 @@ class EmonReporter(object):
                     # test for 'init_settings' and 'runtime_setting' sections
                     settings['interfacers'][name]['init_settings']
                     settings['interfacers'][name]['runtimesettings']
-                except Exception as e:
+                except Exception as err:
                     # If interfacer's settings are incomplete, continue without updating
-                    self._log.error("Unable to update '" + name + "' configuration: " + str(e))
+                    self._log.error("Unable to update '%s' configuration: ", err)
                     continue
                 else:
-                    # check init_settings against the file copy, if they are the same move on to the next
+                    #check init_settings against  file copy, if they are the same move on to next
                     if self._interfacers[name].init_settings == settings['interfacers'][name]['init_settings']:
                         continue
             # Delete interfacers if setting changed or name is unlisted or Type is missing
             self._log.info("Deleting interfacer '%s' ", name)
             self._interfacers[name].stop = True
-            del(self._interfacers[name])
+            del self._interfacers[name]
 
         for name, I in settings['interfacers'].iteritems():
             # If interfacer does not exist, create it
@@ -165,7 +166,7 @@ class EmonReporter(object):
                 try:
                     if not 'Type' in I:
                         continue
-                    self._log.info("Creating " + I['Type'] + " '%s' ", name)
+                    self._log.info("Creating %s '%s' ",I['Type'], name)
                     if I['Type'] in ('EmonModbusTcpInterfacer','EmonFroniusModbusTcpInterfacer') and not pymodbus_found :
                         self._log.error("Python module pymodbus not installed. unable to load modbus interfacer")
                     # This gets the class from the 'Type' string
@@ -173,13 +174,13 @@ class EmonReporter(object):
                     interfacer.set(**I['runtimesettings'])
                     interfacer.init_settings = I['init_settings']
                     interfacer.start()
-                except ehi.EmonHubInterfacerInitError as e:
+                except ehi.EmonHubInterfacerInitError as err:
                     # If interfacer can't be created, log error and skip to next
-                    self._log.error("Failed to create '" + name + "' interfacer: " + str(e))
+                    self._log.error("Failed to create '%s' interfacer: ",name, err)
                     continue
-                except Exception as e:
+                except Exception as err:
                     # If interfacer can't be created, log error and skip to next
-                    self._log.error("Unable to create '" + name + "' interfacer: " + str(e))
+                    self._log.error("Unable to create '%s' interfacer: ",name, err)
                     continue
                 else:
                     self._interfacers[name] = interfacer
@@ -206,17 +207,17 @@ class EmonReporter(object):
         try:
             loglevel = getattr(logging, level)
         except AttributeError:
-            self._log.error('Logging level %s invalid' % level)
+            self._log.error('Logging level %s invalid', level)
             return False
-        except Exception as e:
-            self._log.error('Logging level %s ' % str(e))
+        except Exception as err:
+            self._log.error('Logging level %s ', err)
             return False
         
         # Change level if different from current level
         if loglevel != self._log.getEffectiveLevel():
             self._log.setLevel(level)
             if log:
-                self._log.info('Logging level set to %s' % level)
+                self._log.info('Logging level set to %s', level)
 
         
 if __name__ == "__main__":

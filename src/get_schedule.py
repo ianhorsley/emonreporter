@@ -11,7 +11,7 @@ Gets remote xml file, parses data and configures heatmiser stats.
 # Add logging
 
 import requests
-from time import mktime, strptime #strftime, localtime, 
+from time import mktime, strptime #strftime, localtime,
 import os #import stat, path, utime
 
 from get_config import url, destfile, username, password
@@ -44,7 +44,7 @@ class XmlGetter(object):
             #raise FileNotFoundError("File not xml, credetials may be wrong.")
             raise IOError('file not accessible')
 
-    
+
     @staticmethod
     def _has_changed(header, destfile):
         """Has the file changed compared to local file. Based on timestamp.
@@ -232,7 +232,7 @@ if __name__ == "__main__":
             if i == 0 and len(day) < 4: #if today add one past item
                 day[0:0] = [{'time':timestampnow - timedelta(minutes=10), 'temp': targetlist2[0]['temp'], 'weekday': timestampnow.weekday()}]
                 #bug when time very early in day, should auto shift to day before
-                #if len = 4 should shift to day before  
+                #if len = 4 should shift to day before
             if len(day) < 4:
                 #find items, within 7 days of end of any configured holiday
                 #same day of week
@@ -286,7 +286,7 @@ if __name__ == "__main__":
                     # print "dt", len(daytargets)
                 # for target in daytargets:
                     # print target[0].time(), target[1]
-            
+
             # difference = timedelta(minutes=15)
             # while len(daytargets) > 4 and difference < timedelta(hours=15):
                 # print len(daytargets), range( len(daytargets) - 2, -1, -1)
@@ -294,15 +294,13 @@ if __name__ == "__main__":
                     # print "l", i, i+1, daytargets[i+1][0] - daytargets[i][0]
                     # if daytargets[i+1][0] - daytargets[i][0] <= difference:
                         # daytargets[i:i+1] = [[daytargets[i][0], daytargets[i+1][1]]]
-                
-                # difference *= 2        
-            
-            
+
+                # difference *= 2
+
+
         #for target in targets[0:10]:
-            #2018-11-10T05:15:00+00:00 
+            #2018-11-10T05:15:00+00:00
             #print datetime.strptime(target.attributes['time'].value, '%Y-%m-%dT%H:%M:%S%z')
             #print parse_datetime(target.attributes['time'].value)
             #print target.attributes['time'].value, target.firstChild.data
-        
-        
-        
+ 
