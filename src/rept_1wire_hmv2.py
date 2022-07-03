@@ -287,7 +287,7 @@ if __name__ == "__main__":
             default='30')
     # Configuration file
     parser.add_argument("--config-file", action="store",
-                        help='Configuration file', default=sys.path[0] + '/../conf/reporter.conf')
+                        help='Configuration file', default=sys.path[0] + '/../conf/emonreporter.conf')
     # Log file
     parser.add_argument('--logfile', action='store', type=argparse.FileType('a'),
                         help='Log file (default: log to Standard error stream STDERR)')
