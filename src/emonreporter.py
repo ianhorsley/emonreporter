@@ -30,9 +30,9 @@ class EmonReporter():
 
     def __init__(self, setup_init):
         """Setup an emonReporter.
-        
+
         Interface (EmonHubSetup): User interface to the hub.
-        
+
         """
 
         # Initialize exit request flag
@@ -82,11 +82,11 @@ class EmonReporter():
                 # self._update_settings(self._setup.settings)
             
             # # For all Interfacers
-            # for I in self._interfacers.itervalues():
+            # for interfacer in self._interfacers.itervalues():
                 # # Execute run method
-                # I.run()
+                # interfacer.run()
                 # # Read socket
-                # values = I.read()
+                # values = interfacer.read()
                 # # If complete and valid data was received
                 # if values is not None:
                     # # Place a copy of the values in a queue for each reporter
@@ -106,8 +106,8 @@ class EmonReporter():
         
         self._log.info("Exiting hub...")
 
-        # for I in self._interfacers.itervalues():
-            # I.close()
+        # for interfacer in self._interfacers.itervalues():
+            # interfacer.close()
 
         # for R in self._reporters.itervalues():
             # R.stop = True
@@ -160,34 +160,36 @@ class EmonReporter():
             self._interfacers[name].stop = True
             del self._interfacers[name]
 
-        for name, I in settings['interfacers'].iteritems():
+        for name, interfacer in settings['interfacers'].iteritems():
             # If interfacer does not exist, create it
             if name not in self._interfacers:
                 try:
-                    if not 'Type' in I:
+                    if not 'Type' in interfacer:
                         continue
-                    self._log.info("Creating %s '%s' ",I['Type'], name)
-                    if I['Type'] in ('EmonModbusTcpInterfacer','EmonFroniusModbusTcpInterfacer') and not pymodbus_found :
-                        self._log.error("Python module pymodbus not installed. unable to load modbus interfacer")
+                    self._log.info("Creating %s '%s' ",interfacer['Type'], name)
+                    if interfacer['Type'] in ('EmonModbusTcpInterfacer',
+                                    'EmonFroniusModbusTcpInterfacer') and not pymodbus_found :
+                        self._log.error("Python mod pymodbus not installed. \
+                                            Unable to load modbus interfacer")
                     # This gets the class from the 'Type' string
-                    interfacer = getattr(ehi, I['Type'])(name,**I['init_settings'])
-                    interfacer.set(**I['runtimesettings'])
-                    interfacer.init_settings = I['init_settings']
+                    interfacer = getattr(ehi, interfacer['Type'])(name,**interfacer['init_settings'])
+                    interfacer.set(**interfacer['runtimesettings'])
+                    interfacer.init_settings = interfacer['init_settings']
                     interfacer.start()
                 except ehi.EmonHubInterfacerInitError as err:
                     # If interfacer can't be created, log error and skip to next
-                    self._log.error("Failed to create '%s' interfacer: ",name, err)
+                    self._log.error("Failed to create '%s' interfacer: %s",name, err)
                     continue
                 except Exception as err:
                     # If interfacer can't be created, log error and skip to next
-                    self._log.error("Unable to create '%s' interfacer: ",name, err)
+                    self._log.error("Unable to create '%s' interfacer: %s",name, err)
                     continue
                 else:
                     self._interfacers[name] = interfacer
             else:
                 # Otherwise just update the runtime settings if possible
-                if 'runtimesettings' in I:
-                    self._interfacers[name].set(**I['runtimesettings'])
+                if 'runtimesettings' in interfacer:
+                    self._interfacers[name].set(**interfacer['runtimesettings'])
 
         if 'nodes' in settings:
             ehc.nodelist = settings['nodes']
@@ -218,8 +220,8 @@ class EmonReporter():
             self._log.setLevel(level)
             if log:
                 self._log.info('Logging level set to %s', level)
+        return True
 
-        
 if __name__ == "__main__":
 
     # Command line arguments parser
@@ -280,8 +282,8 @@ if __name__ == "__main__":
     # else:
     try:
         reporter = EmonReporter(setup)
-    except Exception as e:
-        sys.exit("Could not start EmonReporter: " + str(e))
+    except Exception as err:
+        sys.exit("Could not start EmonReporter: " + str(err))
     else:
         reporter.run()
         # When done, close reporter

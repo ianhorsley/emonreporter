@@ -108,7 +108,7 @@ def _check_sensor(ownetobj, name, type_label):
     except pyownet.protocol.Error:
         logging.warning("%s sensor, %s, went away during setup.", type_label, name)
         return 0
-    
+
     return 1
 
 def get_1wire_data(ownet, expected_sensors):
@@ -164,7 +164,10 @@ def initialise_heatmiser(configfile=None):
 
         try:
             current_controller.read_all()
-            disptext = "C%d Air Temp is %.1f from type %.f and Target set to %d  Boiler Demand %d" % (current_controller.set_address, current_controller.read_air_temp(), current_controller.read_air_sensor_type(), current_controller.setroomtemp, current_controller.heatingdemand)
+            disptext = "C%d Air Temp is %.1f from type %.f and Target set %d Demand %d" % (
+                        current_controller.set_address, current_controller.read_air_temp(),
+                        current_controller.read_air_sensor_type(), current_controller.setroomtemp,
+                        current_controller.heatingdemand)
         except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
             logging.warning("C%d in %s Failed to Read due to %s",
                                 current_controller.set_address,
@@ -196,7 +199,7 @@ def get_heatmiser_data():
         #get demands and temps replacing nones
         demands = [99 if row is None or row[3] is None else row[3] for row in allread]
         hotwater = 2 if allread is None or allread[0] is None else allread[0][4]
-        temps = [float(setup.settings['emonsocket']['temperaturenull']) 
+        temps = [float(setup.settings['emonsocket']['temperaturenull'])
                     if temp is None else temp for temp in hmn.All.read_air_temp()]
 
         logging.debug('Temps %s', temps)
@@ -219,7 +222,7 @@ def get_heatmiser_data():
         logging.debug(outputstr)
         return outputstr + '\r\n'
 
-class LocalDatalogger(object):
+class LocalDatalogger():
     """Manages a local daily data logging file."""
     def __init__(self, logfolder):
         self._logfolder = logfolder
@@ -298,7 +301,7 @@ if __name__ == "__main__":
     setup, localconfigfile = initialise_setup(args.config_file)
 
     #setup logging
-    logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], logging.WARN)
+    logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], logging.DEBUG)
 
     # tell the user what is happening
     logging.info("1 wire bus reporting and hmstat reporting")
