@@ -123,14 +123,14 @@ def _start_conversion(ownetobj):
         logging.warning('Could not run conversion on ow due to %s', str(err))
         raise
 
-def get_1wire_data(ownet, expected_sensors):
+def get_1wire_data(ownetobj, expected_sensors):
     """Get data from 1 wire network and and return formatted string"""
     #reset output string
     outputstr = setup.settings['emonsocket']['node']
 
     try:
         _start_conversion(ownetobj)
-    except (pyownet.protocol.Error) as err:
+    except (pyownet.protocol.Error):
         return ''
 
     result_count = 0 #count results
@@ -152,7 +152,7 @@ def _read_temp_sensor(ownetobj, sensor):
     """Read temperature sensor and return result"""
     try:  # just in case it has been unplugged
         # get the temperature from that sensor
-        temp = float(ownet.read(sensor + '/latesttemp'))
+        temp = float(ownetobj.read(sensor + '/latesttemp'))
     except pyownet.protocol.Error:  # it has been unplugged
         logging.warning('Sensor %s gone away - ignoring', sensor)
         temp = float(setup.settings['emonsocket']['temperaturenull'])
@@ -176,7 +176,7 @@ def initialise_heatmiser(configfile=None):
     for current_controller in hm_network.controllers:
         logging.info("Getting all data control %2d in %s",
                         current_controller.set_address, current_controller.set_long_name)
-        _heatmiser_initial_read(curren_controller)
+        _heatmiser_initial_read(current_controller)
 
     return hm_network
 
