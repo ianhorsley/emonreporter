@@ -49,38 +49,24 @@ def initialise_1wire():
     try:
         # connect to localhost port where owserver should be running
         ownet = pyownet.protocol.proxy(host='localhost', port=setup.settings['1wire']['owport'])
-
-        # list every sensor on the bus added that could be added to the list
-        rawlist = ownet.dir()
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not connect to ow due to %s', str(err))
         return []
 
     expected_sensors = setup.settings['1wire']['sensors']
-    #exError
-    #exNotInitialized, exUnknownSensor
 
-    found_sensors = 0 # initialise number of expected temperature sensors found so far
     logging.info("initialising one wire array")
 
     try:
-        rawlist = ownet.dir()
         ownet.write('simultaneous/temperature', data=b'1')    # begin conversions
         time.sleep(0.75)                                   # need to wait for conversion
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not read list and run concersion on ow due to %s', str(err))
         return []
 
-    for sensor in expected_sensors:
-        #logging.info("  considering " + str(s) + ": ")
-        if ownet.present(sensor):
-            found_sensors += _check_sensor(ownet, sensor, "Expected")
-        else:
-            logging.warning("Expected sensor, %s, not found.", sensor)
+    found_sensors = _log_expected_sensors(ownet, expected_sensors)
 
-    for sensor in rawlist:
-        if sensor[:-1] not in expected_sensors:
-            _check_sensor(ownet, sensor[:-1], "New")
+    rawlist = _log_other_sensors(ownet, expected_sensors)
 
     logging.info("bus search done for sensors - %i found - %i temperature - %i missing",
                     len(rawlist),
@@ -110,6 +96,31 @@ def _check_sensor(ownetobj, name, type_label):
         return 0
 
     return 1
+
+def _log_expected_sensors(ownetobj, expected_sensors):
+    """Count expected sensors that are avaliable"""
+    found_sensors = 0 # initialise number of expected temperature sensors found so far
+    for sensor in expected_sensors:
+        #logging.info("  considering " + str(s) + ": ")
+        if ownetobj.present(sensor):
+            found_sensors += _check_sensor(ownetobj, sensor, "Expected")
+        else:
+            logging.warning("Expected sensor, %s, not found.", sensor)
+    return found_sensors
+
+def _log_other_sensors(ownetobj, expected_sensors):
+    """Get all sensor list and log any that are unexpected."""
+    try:
+        # list every sensor on the bus added that could be added to the list
+        rawlist = ownetobj.dir()
+    except (pyownet.protocol.Error) as err:
+        logging.warning('Could not read list and run concersion on ow due to %s', str(err))
+        
+    for sensor in rawlist:
+        if sensor[:-1] not in expected_sensors:
+            _check_sensor(ownetobj, sensor[:-1], "New")
+
+    return rawlist
 
 def get_1wire_data(ownet, expected_sensors):
     """Get data from 1 wire network and and return formatted string"""
