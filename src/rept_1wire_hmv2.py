@@ -46,25 +46,15 @@ def initialise_setup(configfile):
 def initialise_1wire():
     """Initialise 1 wire network and check for sensors"""
     logging.debug("locate sensors and take initial readings:")
+    expected_sensors = setup.settings['1wire']['sensors']
+
     try:
         # connect to localhost port where owserver should be running
         ownet = pyownet.protocol.proxy(host='localhost', port=setup.settings['1wire']['owport'])
+        found_sensors = _log_expected_sensors(ownet, expected_sensors)
     except (pyownet.protocol.Error) as err:
         logging.warning('Could not connect to ow due to %s', str(err))
         return []
-
-    expected_sensors = setup.settings['1wire']['sensors']
-
-    logging.info("initialising one wire array")
-
-    try:
-        ownet.write('simultaneous/temperature', data=b'1')    # begin conversions
-        time.sleep(0.75)                                   # need to wait for conversion
-    except (pyownet.protocol.Error) as err:
-        logging.warning('Could not read list and run concersion on ow due to %s', str(err))
-        return []
-
-    found_sensors = _log_expected_sensors(ownet, expected_sensors)
 
     rawlist = _log_other_sensors(ownet, expected_sensors)
 
@@ -99,6 +89,8 @@ def _check_sensor(ownetobj, name, type_label):
 
 def _log_expected_sensors(ownetobj, expected_sensors):
     """Count expected sensors that are avaliable"""
+    _start_conversion(ownetobj)
+    
     found_sensors = 0 # initialise number of expected temperature sensors found so far
     for sensor in expected_sensors:
         #logging.info("  considering " + str(s) + ": ")
@@ -122,36 +114,32 @@ def _log_other_sensors(ownetobj, expected_sensors):
 
     return rawlist
 
+def _start_conversion(ownetobj):
+    """Start simultaneous temperature conversion and wait"""
+    try:
+        ownetobj.write('simultaneous/temperature', data=b'1')    # begin conversions
+        time.sleep(0.75)                                   # need to wait for conversion
+    except (pyownet.protocol.Error) as err:
+        logging.warning('Could not run conversion on ow due to %s', str(err))
+        raise
+
 def get_1wire_data(ownet, expected_sensors):
     """Get data from 1 wire network and and return formatted string"""
     #reset output string
     outputstr = setup.settings['emonsocket']['node']
 
     try:
-        ownet.write('simultaneous/temperature', data=b'1')    # begin conversions
-        time.sleep(0.75)                                   # need to wait for conversion
+        _start_conversion(ownetobj)
     except (pyownet.protocol.Error) as err:
-        logging.warning('Could not read list and run concersion on ow due to %s', str(err))
         return ''
 
     result_count = 0 #count results
 
     # work through list of sensors
     for sensor in expected_sensors:
-        try:  # just in case it has been unplugged
-            # get the temperature from that sensor
-            temp = float(ownet.read(sensor + '/latesttemp'))
+        temp = _read_temp_sensor(ownetobj, sensor)
+        if temp is not float(setup.settings['emonsocket']['temperaturenull']):
             result_count += 1
-        except pyownet.protocol.Error:  # it has been unplugged
-            logging.warning('Sensor %s gone away - ignoring', sensor)
-            temp = float(setup.settings['emonsocket']['temperaturenull'])
-            #continue  # so we'll jump to the next in the list
-        else:
-            # print sensor name and current value
-            logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensor, temp))
-            stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time, sensor, temp)
-            datalogger.log(stringout)
-
         outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", round(temp * 10 ))))
 
     logging.debug(outputstr)
@@ -159,6 +147,22 @@ def get_1wire_data(ownet, expected_sensors):
     if result_count == 0:
         return ''
     return outputstr + '\r\n'
+
+def _read_temp_sensor(ownetobj, sensor):
+    """Read temperature sensor and return result"""
+    try:  # just in case it has been unplugged
+        # get the temperature from that sensor
+        temp = float(ownet.read(sensor + '/latesttemp'))
+    except pyownet.protocol.Error:  # it has been unplugged
+        logging.warning('Sensor %s gone away - ignoring', sensor)
+        temp = float(setup.settings['emonsocket']['temperaturenull'])
+        #continue  # so we'll jump to the next in the list
+    else:
+        # print sensor name and current value
+        logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensor, temp))
+        stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time, sensor, temp)
+        datalogger.log(stringout)
+    return temp
     
 def initialise_heatmiser(configfile=None):
     """Initialise heatmiser network and check for sensors"""
@@ -172,25 +176,28 @@ def initialise_heatmiser(configfile=None):
     for current_controller in hm_network.controllers:
         logging.info("Getting all data control %2d in %s",
                         current_controller.set_address, current_controller.set_long_name)
+        _heatmiser_initial_read(curren_controller)
 
-        try:
-            current_controller.read_all()
-            disptext = "C%d Air Temp is %.1f from type %.f and Target set %d Demand %d" % (
-                        current_controller.set_address, current_controller.read_air_temp(),
-                        current_controller.read_air_sensor_type(), current_controller.setroomtemp,
-                        current_controller.heatingdemand)
-        except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
-            logging.warning("C%d in %s Failed to Read due to %s",
-                                current_controller.set_address,
-                                current_controller.name.ljust(4),
-                                str(err))
-        else:
-            if current_controller.is_hot_water:
-                logging.info("%s Hot Water Demand %d", disptext, current_controller.hotwaterdemand)
-            else:
-                logging.info(disptext)
-          
     return hm_network
+
+def _heatmiser_initial_read(controller):
+    """Get all data from a heatmiser sensor"""
+    try:
+        controller.read_all()
+        disptext = "C%d Air Temp is %.1f from type %.f and Target set %d Demand %d" % (
+                    controller.set_address, controller.read_air_temp(),
+                    controller.read_air_sensor_type(), controller.setroomtemp,
+                    controller.heatingdemand)
+    except (HeatmiserResponseError, HeatmiserControllerTimeError) as err:
+        logging.warning("C%d in %s Failed to Read due to %s",
+                            controller.set_address,
+                            controller.name.ljust(4),
+                            str(err))
+    else:
+        if controller.is_hot_water:
+            logging.info("%s Hot Water Demand %d", disptext, controller.hotwaterdemand)
+        else:
+            logging.info(disptext)
 
 def get_heatmiser_data():
     """Get data from heatmiser network and and return formatted string"""
