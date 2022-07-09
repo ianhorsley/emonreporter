@@ -64,7 +64,7 @@ def initialise_1wire():
                     len(expected_sensors) - found_sensors)
 
     if found_sensors == 0:
-        return []
+        return ownet, []
 
     return ownet, expected_sensors
 
