@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ program to interogate 1-wire bus and report all known temperatures
 # with some commentary
