@@ -19,17 +19,12 @@ import time
 import argparse
 import socket
 import logging
-from serial import SerialException
-import pyownet # use OWFS pyownet module
 
 # hm imports
-from heatmisercontroller import network, logging_setup
-from heatmisercontroller.exceptions import HeatmiserResponseError, HeatmiserControllerTimeError
+from heatmisercontroller import logging_setup
 import heatmisercontroller.setup as hms
 
-import emonhub_coder
-
-from rept_1wire_hmv2 import *
+from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data
 
 # set up parser with command summary
 parser = argparse.ArgumentParser(
@@ -91,5 +86,5 @@ while 1:
             logging.info('socket send %s', output_message)
             logging.debug(soc.sendall(output_message.encode('utf-8')))
             soc.close()
-        except IOError as err:
-            logging.warning('could not connect to emonhub due to %s', err)
+        except IOError as errcatch:
+            logging.warning('could not connect to emonhub due to %s', errcatch)
