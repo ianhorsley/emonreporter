@@ -55,7 +55,7 @@ class EmonReporter():
         self._set_logging_level('INFO', False)
         self._log.info("EmonReporter %s", self.__version__)
         self._log.info("Opening reporter...")
-        
+
         # Initialize Interfacers
         self._interfacers = {}
 

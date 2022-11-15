@@ -22,9 +22,8 @@ import logging
 
 # hm imports
 from heatmisercontroller import logging_setup
-import heatmisercontroller.setup as hms
 
-from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data
+from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data, LocalDatalogger
 
 # set up parser with command summary
 parser = argparse.ArgumentParser(
@@ -73,10 +72,8 @@ while 1:
     # get time now and record it
     read_time = int(time.time()) # we only record to integer seconds
 
-    output_message = ''
-
     logging.info("Logging cyle at %d", read_time)
-    output_message += get_1wire_data(onewirenetwork, sensorlist1wire)
+    output_message = get_1wire_data(onewirenetwork, sensorlist1wire)
 
     if len(output_message) > 0:
         try:

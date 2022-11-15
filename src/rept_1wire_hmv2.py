@@ -107,7 +107,7 @@ def _log_other_sensors(ownetobj, expected_sensors):
         rawlist = ownetobj.dir()
     except (pyownet.protocol.Error) as errcatch:
         logging.warning('Could not read list and run concersion on ow due to %s', str(errcatch))
-        
+
     for sensor in rawlist:
         if sensor[:-1] not in expected_sensors:
             _check_sensor(ownetobj, sensor[:-1], "New")
@@ -360,5 +360,5 @@ if __name__ == "__main__":
                 logging.info('socket send %s', output_message)
                 logging.debug(soc.sendall(output_message.encode('utf-8')))
                 soc.close()
-            except IOError as errcatch:
-                logging.warning('could not connect to emonhub due to %s', errcatch)
+            except IOError as mainerrcatch:
+                logging.warning('could not connect to emonhub due to %s', mainerrcatch)
