@@ -163,7 +163,7 @@ def _read_temp_sensor(ownetobj, sensor):
         stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time, sensor, temp)
         datalogger.log(stringout)
     return temp
-    
+
 def initialise_heatmiser(configfile=None):
     """Initialise heatmiser network and check for sensors"""
     logging.info("initialising hm network")
@@ -293,11 +293,10 @@ class LocalDatalogger():
             else:
                 logging.debug('logged to file: %s', stringout)
 
-if __name__ == "__main__":
-
+def get_args(desc_text):
     # set up parser with command summary
     parser = argparse.ArgumentParser(
-            description='Rolling 1-wire and heatmiser temperatures report')
+            description=desc_text)
     # set up arguments with associated help and defaults
     parser.add_argument('-i',
             dest='sample_interval',
@@ -305,13 +304,30 @@ if __name__ == "__main__":
             default='30')
     # Configuration file
     parser.add_argument("--config-file", action="store",
-                        help='Configuration file', default=sys.path[0] + '/../conf/emonreporter.conf')
+                        help='Config file', default=sys.path[0] + '/../conf/emonreporter.conf')
     # Log file
     parser.add_argument('--logfile', action='store', type=argparse.FileType('a'),
                         help='Log file (default: log to Standard error stream STDERR)')
             
     # process the arguments
-    args=parser.parse_args()
+    return parser.parse_args()
+
+def send_message(setup, message_text):
+    if len(message_text) > 0:
+        try:
+            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            soc.connect((setup.settings['emonsocket']['host'],
+                            int(setup.settings['emonsocket']['port'])))
+            logging.info('socket send %s', message_text)
+            logging.debug(soc.sendall(message_text.encode('utf-8')))
+            soc.close()
+        except IOError as mainerrcatch:
+            logging.warning('could not connect to emonhub due to %s', mainerrcatch)
+
+
+if __name__ == "__main__":
+
+    args = get_args('Rolling 1-wire and heatmiser temperatures report')
     
     # turn the arguments into numbers
     sample_interval=float(args.sample_interval)
@@ -352,13 +368,4 @@ if __name__ == "__main__":
         if hmn is not None:
             output_message += get_heatmiser_data()
 
-        if len(output_message) > 0:
-            try:
-                soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                soc.connect((setup.settings['emonsocket']['host'],
-                                int(setup.settings['emonsocket']['port'])))
-                logging.info('socket send %s', output_message)
-                logging.debug(soc.sendall(output_message.encode('utf-8')))
-                soc.close()
-            except IOError as mainerrcatch:
-                logging.warning('could not connect to emonhub due to %s', mainerrcatch)
+        send_message(setup, output_message)

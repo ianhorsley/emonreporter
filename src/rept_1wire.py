@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ program to interogate 1-wire bus and report all known temperatures
 # with some commentary
@@ -23,25 +23,9 @@ import logging
 # hm imports
 from heatmisercontroller import logging_setup
 
-from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data, LocalDatalogger
+from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data, LocalDatalogger, get_args, send_message
 
-# set up parser with command summary
-parser = argparse.ArgumentParser(
-        description='Rolling 1-wire and heatmiser temperatures report')
-# set up arguments with associated help and defaults
-parser.add_argument('-i',
-        dest='sample_interval',
-        help='interval in seconds between samples',
-        default='30')
-# Configuration file
-parser.add_argument("--config-file", action="store",
-                    help='Configuration file', default=sys.path[0] + '/../conf/emonreporter.conf')
-# Log file
-parser.add_argument('--logfile', action='store', type=argparse.FileType('a'),
-                    help='Log file (default: log to Standard error stream STDERR)')
-
-# process the arguments
-args=parser.parse_args()
+args = get_args('Rolling 1-wire temperatures report')
 
 # turn the arguments into numbers
 sample_interval=float(args.sample_interval)
@@ -75,13 +59,4 @@ while 1:
     logging.info("Logging cyle at %d", read_time)
     output_message = get_1wire_data(onewirenetwork, sensorlist1wire)
 
-    if len(output_message) > 0:
-        try:
-            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            soc.connect((setup.settings['emonsocket']['host'],
-                            int(setup.settings['emonsocket']['port'])))
-            logging.info('socket send %s', output_message)
-            logging.debug(soc.sendall(output_message.encode('utf-8')))
-            soc.close()
-        except IOError as errcatch:
-            logging.warning('could not connect to emonhub due to %s', errcatch)
+    send_message(setup, output_message)
