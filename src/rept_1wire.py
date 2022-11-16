@@ -55,6 +55,6 @@ while 1:
     read_time = int(time.time()) # we only record to integer seconds
 
     logging.info("Logging cyle at %d", read_time)
-    output_message = get_1wire_data(onewirenetwork, sensorlist1wire)
+    output_message = get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
 
     send_message(setup, output_message)

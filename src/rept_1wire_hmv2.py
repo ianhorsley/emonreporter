@@ -123,7 +123,7 @@ def _start_conversion(ownetobj):
         logging.warning('Could not run conversion on ow due to %s', str(errcatch))
         raise
 
-def get_1wire_data(ownetobj, expected_sensors):
+def get_1wire_data(ownetobj, expected_sensors, read_time_out):
     """Get data from 1 wire network and and return formatted string"""
     #reset output string
     outputstr = setup.settings['emonsocket']['node']
@@ -137,7 +137,7 @@ def get_1wire_data(ownetobj, expected_sensors):
 
     # work through list of sensors
     for sensor in expected_sensors:
-        temp = _read_temp_sensor(ownetobj, sensor)
+        temp = _read_temp_sensor(ownetobj, sensor, read_time_out)
         if temp is not float(setup.settings['emonsocket']['temperaturenull']):
             result_count += 1
         outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", round(temp * 10 ))))
@@ -148,7 +148,7 @@ def get_1wire_data(ownetobj, expected_sensors):
         return ''
     return outputstr + '\r\n'
 
-def _read_temp_sensor(ownetobj, sensor):
+def _read_temp_sensor(ownetobj, sensor, read_time_out):
     """Read temperature sensor and return result"""
     try:  # just in case it has been unplugged
         # get the temperature from that sensor
@@ -160,7 +160,7 @@ def _read_temp_sensor(ownetobj, sensor):
     else:
         # print sensor name and current value
         logging.info( 'Logging Sensor {!s}: {:-6.2f}'.format(sensor, temp))
-        stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time, sensor, temp)
+        stringout = '{}:{!s}:{:+06.2f}\n'.format(read_time_out, sensor, temp)
         datalogger.log(stringout)
     return temp
 
@@ -199,7 +199,7 @@ def _heatmiser_initial_read(controller):
         else:
             logging.info(disptext)
 
-def get_heatmiser_data():
+def get_heatmiser_data(read_time_out):
     """Get data from heatmiser network and and return formatted string"""
     try:
         #read all fields needed now
@@ -227,7 +227,7 @@ def get_heatmiser_data():
         encodedtemps = [' '.join(map(str,emonhub_coder.encode("h",temp * 10 ))) for temp in temps ]
 
         logging.info('Logging heatmiser data')
-        stringout = str(read_time)
+        stringout = str(read_time_out)
         tempstring = ':TEMP' + ','.join(str(tep) for tep in temps)
         demandsstring = 'DEMAND' + ','.join(str(tep) for tep in demands)
         hotwaterstring = 'HOTW' + str(hotwater)
@@ -365,9 +365,9 @@ if __name__ == "__main__":
         output_message = ''
         
         logging.info("Logging cyle at %d", read_time)
-        output_message += get_1wire_data(onewirenetwork, sensorlist1wire)
+        output_message += get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
         
         if hmn is not None:
-            output_message += get_heatmiser_data()
+            output_message += get_heatmiser_data(read_time)
 
         send_message(setup, output_message)
