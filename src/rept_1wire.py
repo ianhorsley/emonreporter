@@ -8,7 +8,11 @@
 # 2018/11/02
 # updated to add more error catching and remove trend code
 # /lib/systemd/system/1wireemon.service
-# /home/pi/data/emonhub.conf"""
+# /home/pi/data/emonhub.conf
+# install owserver
+# /etc/owfs.conf replace
+# server: FAKE = DS18S20,DS2405
+# server: w1  #if using GPIO"""
 
 # standard library modules used in code
 from __future__ import absolute_import
@@ -37,7 +41,7 @@ logging_setup.initialize_logger_full(setup.settings['logging']['logfolder'], log
 logging.info("1 wire bus reporting")
 logging.info("  sample interval: %d seconds", sample_interval )
 
-onewirenetwork, sensorlist1wire = initialise_1wire()
+onewirenetwork, sensorlist1wire = initialise_1wire(setup)
 
 datalogger = LocalDatalogger(setup.settings['logging']['logfolder'])
 
@@ -55,6 +59,6 @@ while 1:
     read_time = int(time.time()) # we only record to integer seconds
 
     logging.info("Logging cyle at %d", read_time)
-    _, _, output_message = get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
+    _, _, output_message = get_1wire_data(setup, onewirenetwork, sensorlist1wire, read_time, datalogger)
 
     send_message(setup, output_message)

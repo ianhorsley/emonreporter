@@ -43,7 +43,7 @@ def initialise_setup(configfile):
 
     return int_setup, configfile
 
-def initialise_1wire():
+def initialise_1wire(setup):
     """Initialise 1 wire network and check for sensors"""
     logging.debug("locate sensors and take initial readings:")
     expected_sensors = setup.settings['1wire']['sensors']
@@ -123,7 +123,7 @@ def _start_conversion(ownetobj):
         logging.warning('Could not run conversion on ow due to %s', str(errcatch))
         raise
 
-def get_1wire_data(ownetobj, expected_sensors, read_time_out):
+def get_1wire_data(setup, ownetobj, expected_sensors, read_time_out, datalogger):
     """Get data from 1 wire network and and return formatted string"""
     temps = list() # list of temps
     result_count = 0  # count results
@@ -138,7 +138,7 @@ def get_1wire_data(ownetobj, expected_sensors, read_time_out):
 
     # work through list of sensors
     for sensor in expected_sensors:
-        temp = _read_temp_sensor(ownetobj, sensor, read_time_out)
+        temp = _read_temp_sensor(ownetobj, sensor, read_time_out, datalogger, setup)
         temps.append(temp)
         if temp is not float(setup.settings['emonsocket']['temperaturenull']):
             result_count += 1
@@ -150,7 +150,7 @@ def get_1wire_data(ownetobj, expected_sensors, read_time_out):
         return temps, result_count, ''
     return temps, result_count, outputstr + '\r\n'
 
-def _read_temp_sensor(ownetobj, sensor, read_time_out):
+def _read_temp_sensor(ownetobj, sensor, read_time_out, datalogger, setup):
     """Read temperature sensor and return result"""
     try:  # just in case it has been unplugged
         # get the temperature from that sensor
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     logging.info("1 wire bus reporting and hmstat reporting")
     logging.info("  sample interval: %d seconds", sample_interval )
 
-    onewirenetwork, sensorlist1wire = initialise_1wire()
+    onewirenetwork, sensorlist1wire = initialise_1wire(setup)
 
     hmn = initialise_heatmiser(localconfigfile)
 
@@ -365,7 +365,7 @@ if __name__ == "__main__":
         read_time = int(time.time()) # we only record to integer seconds
             
         logging.info("Logging cyle at %d", read_time)
-        _, _, output_message = get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
+        _, _, output_message = get_1wire_data(setup, onewirenetwork, sensorlist1wire, read_time, datalogger)
         
         if hmn is not None:
             output_message += get_heatmiser_data(read_time)
