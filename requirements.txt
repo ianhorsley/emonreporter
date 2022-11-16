@@ -1,0 +1,7 @@
+logging
+pyserial
+configobj
+requests
+heatmisercontroller == 0.33
+coverage
+codacy-coverage

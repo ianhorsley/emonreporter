@@ -1,0 +1,16 @@
+[Unit]
+Description=Report 1-wire data and hm to emonhub
+# The config file lives in /etc/emonhub/emonhub.conf
+# The log file lives in /var/log/emonhub/emonhub.log not yet
+Requires=var-log.mount
+After=var-log.mount network.target
+ 
+[Service]
+ExecStart=/usr/local/bin/emonreporter/rept_1wire_hmv2.py --config-file=/etc/emonreporter/emonreporter.conf --logfile=/var/log/emonreporter/emonreporter.log
+ExecStartPre=/bin/mkdir -p -m 0775 /var/log/emonreporter/
+Type=exec
+Restart=always
+RestartSec=5
+ 
+[Install]
+WantedBy=multi-user.target
