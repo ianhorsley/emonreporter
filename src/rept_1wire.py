@@ -14,16 +14,14 @@
 from __future__ import absolute_import
 from __future__ import division
 
-import sys
 import time
-import argparse
-import socket
 import logging
 
 # hm imports
 from heatmisercontroller import logging_setup
 
-from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data, LocalDatalogger, get_args, send_message
+from rept_1wire_hmv2 import initialise_setup, initialise_1wire, get_1wire_data
+from rept_1wire_hmv2 import LocalDatalogger, get_args, send_message
 
 args = get_args('Rolling 1-wire temperatures report')
 

@@ -244,20 +244,20 @@ class LocalDatalogger():
     """Manages a local daily data logging file."""
     def __init__(self, logfolder):
         self._logfolder = logfolder
-        
+
         self._outputfile = None
         self._openfilename = False
         self._file_day_stamp = False
-        
+
         self._open_file(time.time())
-    
+
     def _check_day(self, timestamp):
         """Open new file if the day has changed."""
         daystamp = timestamp//86400
         if self._file_day_stamp != daystamp:
             self._close_file()
             self._open_file(timestamp)
-    
+
     def _open_file(self, timestamp):
         """Open data file and store handle"""
         self._file_day_stamp = timestamp//86400
@@ -271,7 +271,7 @@ class LocalDatalogger():
                                 errcatch.errno, errcatch.strerror)
         else:
             logging.info('opened file %s', self._openfilename)
-    
+
     def _close_file(self):
         """Close data file."""
         if self._file_day_stamp is not False:
@@ -294,6 +294,7 @@ class LocalDatalogger():
                 logging.debug('logged to file: %s', stringout)
 
 def get_args(desc_text):
+    """Setups and parser and processes the arguements"""
     # set up parser with command summary
     parser = argparse.ArgumentParser(
             description=desc_text)
@@ -312,12 +313,13 @@ def get_args(desc_text):
     # process the arguments
     return parser.parse_args()
 
-def send_message(setup, message_text):
+def send_message(setuparray, message_text):
+    """Send a message over socket interface."""
     if len(message_text) > 0:
         try:
             soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            soc.connect((setup.settings['emonsocket']['host'],
-                            int(setup.settings['emonsocket']['port'])))
+            soc.connect((setuparray.settings['emonsocket']['host'],
+                            int(setuparray.settings['emonsocket']['port'])))
             logging.info('socket send %s', message_text)
             logging.debug(soc.sendall(message_text.encode('utf-8')))
             soc.close()
