@@ -125,19 +125,21 @@ def _start_conversion(ownetobj):
 
 def get_1wire_data(ownetobj, expected_sensors, read_time_out):
     """Get data from 1 wire network and and return formatted string"""
-    #reset output string
+    temps = list() # list of temps
+    result_count = 0  # count results
+    # reset output string
     outputstr = setup.settings['emonsocket']['node']
 
     try:
         _start_conversion(ownetobj)
     except pyownet.protocol.Error:
-        return ''
+        return temps, result_count, ''
 
-    result_count = 0 #count results
 
     # work through list of sensors
     for sensor in expected_sensors:
         temp = _read_temp_sensor(ownetobj, sensor, read_time_out)
+        temps.append(temp)
         if temp is not float(setup.settings['emonsocket']['temperaturenull']):
             result_count += 1
         outputstr += ' ' + ' '.join(map(str,emonhub_coder.encode("h", round(temp * 10 ))))
@@ -145,8 +147,8 @@ def get_1wire_data(ownetobj, expected_sensors, read_time_out):
     logging.debug(outputstr)
 
     if result_count == 0:
-        return ''
-    return outputstr + '\r\n'
+        return temps, result_count, ''
+    return temps, result_count, outputstr + '\r\n'
 
 def _read_temp_sensor(ownetobj, sensor, read_time_out):
     """Read temperature sensor and return result"""
@@ -361,11 +363,9 @@ if __name__ == "__main__":
 
         # get time now and record it
         read_time = int(time.time()) # we only record to integer seconds
-        
-        output_message = ''
-        
+            
         logging.info("Logging cyle at %d", read_time)
-        output_message += get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
+        _, _, output_message = get_1wire_data(onewirenetwork, sensorlist1wire, read_time)
         
         if hmn is not None:
             output_message += get_heatmiser_data(read_time)
