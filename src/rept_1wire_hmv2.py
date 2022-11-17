@@ -148,7 +148,7 @@ def get_1wire_data(setup, ownetobj, expected_sensors, read_time_out, datalogger)
 
     if result_count == 0:
         return temps, result_count, ''
-    return temps, result_count, outputstr + '\r\n'
+    return temps, result_count, outputstr
 
 def _read_temp_sensor(ownetobj, sensor, read_time_out, datalogger, setup):
     """Read temperature sensor and return result"""
@@ -319,6 +319,7 @@ def send_message(setuparray, message_text):
     """Send a message over socket interface."""
     if len(message_text) > 0:
         try:
+            message_text += '\r\n'
             soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             soc.connect((setuparray.settings['emonsocket']['host'],
                             int(setuparray.settings['emonsocket']['port'])))
